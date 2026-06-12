@@ -1,0 +1,64 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212; /* Fondo negro elegante */
+    color: #f0f0f0; /* Texto claro */
+  }
+  
+  header {
+    background-color: #1f1f1f;
+    padding: 20px;
+    text-align: center;
+    font-size: 2rem;
+    color: #00ff88; /* Verde neón */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+  }
+  
+  .section {
+    padding: 20px;
+    margin: 20px;
+    background-color: #1e1e1e;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  
+  .button {
+    display: inline-block;
+    padding: 12px 20px;
+    margin: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    color: #fff;
+  }
+  
+  .button.green {
+    background-color: #00c853;
+  }
+  .button.green:hover {
+    background-color: #00e676;
+  }
+  
+  .button.red {
+    background-color: #d32f2f;
+  }
+  .button.red:hover {
+    background-color: #f44336;
+  }
+  
+  .button.yellow {
+    background-color: #fbc02d;
+    color: #000;
+  }
+  .button.yellow:hover {
+    background-color: #ffee58;
+  }
+  
+  h2 {
+    margin-top: 0;
+    color: #ffffff;
+  }
+  

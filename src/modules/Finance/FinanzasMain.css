@@ -1,0 +1,178 @@
+.finanzas-bg {
+  min-height: 100vh;
+  min-width: 100vw;
+  /* Elimina o comenta la línea de background aquí */
+  position: relative;
+  padding-bottom: 120px;
+}
+
+.finanzas-menu-horizontal {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin: 50px 0 30px 0;
+  flex-wrap: wrap;
+}
+
+.finanzas-menu-btn {
+  background: #fff;
+  color: #111;
+  border: none;
+  border-radius: 14px;
+  padding: 28px 48px;
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px #0002;
+  transition: filter 0.2s, transform 0.2s, background 0.2s, color 0.2s;
+}
+
+.finanzas-menu-btn.active,
+.finanzas-menu-btn:hover {
+  background: #39ff14;
+  color: #111;
+  filter: brightness(1.1) drop-shadow(0 0 10px #39ff14);
+  transform: scale(1.07);
+}
+
+.finanzas-menu-btn.ingresar {
+  background: #111;
+  color: #39ff14;
+  border: 2px solid #39ff14;
+}
+
+.finanzas-seccion-panel {
+  background: rgba(255,255,255,0.97);
+  border-radius: 18px;
+  max-width: 1100px;
+  margin: 0 auto 40px auto;
+  padding: 36px 32px 32px 32px;
+  box-shadow: 0 0 24px #39ff1440;
+  position: relative;
+}
+
+.volver-finanzas-btn {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+  background: #39ff14;
+  color: #222;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 28px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.finanzas-seccion-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 30px;
+}
+.finanzas-seccion-tabla th, .finanzas-seccion-tabla td {
+  border-bottom: 1px solid #4442;
+  padding: 10px 8px;
+  text-align: left;
+  font-size: 1.2rem;
+}
+.finanzas-seccion-tabla th {
+  color: #39ff14;
+  font-size: 1.3rem;
+}
+
+.finanzas-modal-bg {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.finanzas-modal {
+  background: #fff;
+  border-radius: 18px;
+  padding: 36px 32px;
+  min-width: 350px;
+  box-shadow: 0 0 40px #39ff14;
+}
+.finanzas-modal label {
+  display: block;
+  margin-bottom: 18px;
+  font-size: 1.2rem;
+  color: #111;
+}
+.finanzas-modal input,
+.finanzas-modal select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  margin-top: 4px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  margin-bottom: 8px;
+}
+.finanzas-modal-botones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 18px;
+}
+.guardar-btn {
+  background: #39ff14;
+  color: #222;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.cancelar-btn {
+  background: #eee;
+  color: #222;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.finanzas-graficas {
+  display: flex;
+  justify-content: space-around;
+  gap: 32px;
+  margin: 40px 0 0 0;
+  padding: 0 40px;
+}
+.grafica-placeholder {
+  flex: 1 1 0;
+  min-width: 250px;
+  min-height: 180px;
+  background: #fff8;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111;
+  font-size: 1.3rem;
+  font-weight: bold;
+  box-shadow: 0 2px 12px #0002;
+}
+
+.volver-dashboard-btn {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  background: #39ff14;
+  color: #222;
+  border: none;
+  border-radius: 14px;
+  padding: 22px 50px;
+  font-size: 2rem;
+  cursor: pointer;
+  font-weight: bold;
+  z-index: 200;
+}

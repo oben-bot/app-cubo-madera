@@ -1,0 +1,19 @@
+{
+  "files": {
+    "main.css": "./static/css/main.79af947c.css",
+    "main.js": "./static/js/main.653aea20.js",
+    "static/media/menu-bg.jpg": "./static/media/menu-bg.5c2d06fcaeeace70fa4d.jpg",
+    "static/media/fire-bg.jpg": "./static/media/fire-bg.362f9982dfdddd7013cf.jpg",
+    "static/media/finanzas-bg.jpg": "./static/media/finanzas-bg.bc20dfddb54ed46152e1.jpg",
+    "static/media/trabajo-bg.jpg": "./static/media/trabajo-bg.ac5f46bc07fd0d9e0ef3.jpg",
+    "static/media/trash-icon.svg": "./static/media/trash-icon.847f5fd17a3afa6c0e0796876e45686a.svg",
+    "static/media/calendar-icon.svg": "./static/media/calendar-icon.637e4c297353c5b4cf9c922a2d7204bc.svg",
+    "index.html": "./index.html",
+    "main.79af947c.css.map": "./static/css/main.79af947c.css.map",
+    "main.653aea20.js.map": "./static/js/main.653aea20.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.79af947c.css",
+    "static/js/main.653aea20.js"
+  ]
+}
