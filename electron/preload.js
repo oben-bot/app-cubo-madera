@@ -55,6 +55,21 @@ contextBridge.exposeInMainWorld('electron', {
     delete: (id) => ipcRenderer.invoke('trabajos:delete', id),
     getCotizacionesAprobadas: () => ipcRenderer.invoke('trabajos:getCotizacionesAprobadas')
   },
+  // Ventas
+  ventas: {
+    getAll: () => ipcRenderer.invoke('ventas:getAll'),
+    getById: (id) => ipcRenderer.invoke('ventas:getById', id),
+    crearDesdeTrabajo: (trabajoId, metodo_pago) => ipcRenderer.invoke('ventas:crearDesdeTrabajo', trabajoId, metodo_pago),
+    create: (venta) => ipcRenderer.invoke('ventas:create', venta),
+    delete: (id) => ipcRenderer.invoke('ventas:delete', id)
+  },
+  // Finanzas
+  finanzas: {
+    getAll: () => ipcRenderer.invoke('finanzas:getAll'),
+    registrarEgreso: (egreso) => ipcRenderer.invoke('finanzas:registrarEgreso', egreso),
+    getResumen: (periodo) => ipcRenderer.invoke('finanzas:getResumen', periodo),
+    getTrabajosTerminados: () => ipcRenderer.invoke('finanzas:getTrabajosTerminados')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),

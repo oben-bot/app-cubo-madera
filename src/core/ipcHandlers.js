@@ -19,6 +19,14 @@ const generarNumeroTrabajo = () => {
   return `TR-${año}${mes}-${count}`;
 };
 
+const generarFolioVenta = () => {
+  const fecha = new Date();
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const numero = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `VTA-${año}${mes}-${numero}`;
+};
+
 function registerIpcHandlers(ipcMain, mainWindow) {
   initializeDatabase();
 
@@ -395,6 +403,167 @@ function registerIpcHandlers(ipcMain, mainWindow) {
         SELECT cotizacion_id FROM trabajos WHERE cotizacion_id IS NOT NULL
       )
       ORDER BY c.fecha DESC
+    `);
+  });
+
+  // ==================== VENTAS HANDLERS ====================
+
+  ipcMain.handle('ventas:getAll', async () => {
+    return query(`
+      SELECT v.*, c.nombre as cliente_nombre, t.numero_trabajo
+      FROM ventas v
+      LEFT JOIN clientes c ON v.cliente_id = c.id
+      LEFT JOIN trabajos t ON v.trabajo_id = t.id
+      ORDER BY v.fecha DESC
+    `);
+  });
+
+  ipcMain.handle('ventas:getById', async (_, id) => {
+    const venta = get(`
+      SELECT v.*, c.nombre as cliente_nombre, c.telefono, c.email
+      FROM ventas v
+      LEFT JOIN clientes c ON v.cliente_id = c.id
+      WHERE v.id = ?
+    `, [id]);
+    
+    if (venta) {
+      venta.detalles = query('SELECT * FROM ventas_detalle WHERE venta_id = ?', [id]);
+    }
+    return venta;
+  });
+
+  ipcMain.handle('ventas:crearDesdeTrabajo', async (_, trabajoId, metodo_pago) => {
+    const trabajo = get('SELECT * FROM trabajos WHERE id = ?', [trabajoId]);
+    if (!trabajo) throw new Error('Trabajo no encontrado');
+    
+    const folio = generarFolioVenta();
+    const db = getDb();
+    
+    let ventaId;
+    const transaction = db.transaction(() => {
+      const result = run(`INSERT INTO ventas 
+        (folio, trabajo_id, cliente_id, total, metodo_pago, notas) 
+        VALUES (?, ?, ?, ?, ?, ?)`, 
+        [folio, trabajoId, trabajo.cliente_id, trabajo.precio_total, metodo_pago, `Venta del trabajo ${trabajo.numero_trabajo}`]);
+      ventaId = result.lastInsertRowid;
+      
+      run(`INSERT INTO finanzas_movimientos 
+        (tipo, categoria, monto, referencia_id, referencia_tipo, descripcion, usuario) 
+        VALUES ('ingreso', 'venta', ?, ?, 'venta', ?, 'sistema')`,
+        [trabajo.precio_total, ventaId, `Venta ${folio}`]);
+      
+      run('UPDATE trabajos SET estado = "entregado", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [trabajoId]);
+    });
+    transaction();
+    
+    return { id: ventaId, folio };
+  });
+
+  ipcMain.handle('ventas:create', async (_, venta) => {
+    const folio = generarFolioVenta();
+    const db = getDb();
+    
+    let ventaId;
+    const transaction = db.transaction(() => {
+      const result = run(`INSERT INTO ventas 
+        (folio, cliente_id, subtotal, iva, total, metodo_pago, notas) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [folio, venta.cliente_id, venta.subtotal, venta.iva, venta.total, venta.metodo_pago, venta.notas]);
+      ventaId = result.lastInsertRowid;
+      
+      if (venta.detalles && venta.detalles.length > 0) {
+        for (const detalle of venta.detalles) {
+          run(`INSERT INTO ventas_detalle 
+            (venta_id, producto_id, descripcion, cantidad, precio_unitario, total) 
+            VALUES (?, ?, ?, ?, ?, ?)`,
+            [ventaId, detalle.producto_id, detalle.descripcion, detalle.cantidad, detalle.precio_unitario, detalle.total]);
+          
+          if (detalle.producto_id) {
+            run(`UPDATE inventario SET cantidad = cantidad - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+              [detalle.cantidad, detalle.producto_id]);
+            
+            run(`INSERT INTO movimientos_inventario 
+              (producto_id, tipo, cantidad, motivo, referencia_id, referencia_tipo, notas) 
+              VALUES (?, 'salida', ?, 'venta', ?, 'venta', ?)`,
+              [detalle.producto_id, -detalle.cantidad, ventaId, `Venta ${folio}`]);
+          }
+        }
+      }
+      
+      run(`INSERT INTO finanzas_movimientos 
+        (tipo, categoria, monto, referencia_id, referencia_tipo, descripcion, usuario) 
+        VALUES ('ingreso', 'venta', ?, ?, 'venta', ?, 'sistema')`,
+        [venta.total, ventaId, `Venta ${folio}`]);
+    });
+    transaction();
+    
+    return { id: ventaId, folio };
+  });
+
+  ipcMain.handle('ventas:delete', async (_, id) => {
+    const result = run('DELETE FROM ventas WHERE id = ?', [id]);
+    return { success: result.changes > 0 };
+  });
+
+  // ==================== FINANZAS HANDLERS ====================
+
+  ipcMain.handle('finanzas:getAll', async () => {
+    return query('SELECT * FROM finanzas_movimientos ORDER BY fecha DESC LIMIT 500');
+  });
+
+  ipcMain.handle('finanzas:registrarEgreso', async (_, egreso) => {
+    const result = run(`INSERT INTO finanzas_movimientos 
+      (tipo, categoria, monto, descripcion, usuario) 
+      VALUES ('egreso', ?, ?, ?, ?)`,
+      [egreso.categoria, egreso.monto, egreso.descripcion, egreso.usuario]);
+    return { id: result.lastInsertRowid };
+  });
+
+  ipcMain.handle('finanzas:getResumen', async (_, periodo) => {
+    let fechaInicio = '';
+    const hoy = new Date();
+    
+    switch(periodo) {
+      case 'dia':
+        fechaInicio = new Date(hoy.setHours(0,0,0,0)).toISOString();
+        break;
+      case 'semana':
+        fechaInicio = new Date(hoy.setDate(hoy.getDate() - 7)).toISOString();
+        break;
+      case 'mes':
+        fechaInicio = new Date(hoy.setMonth(hoy.getMonth() - 1)).toISOString();
+        break;
+      case 'año':
+        fechaInicio = new Date(hoy.setFullYear(hoy.getFullYear() - 1)).toISOString();
+        break;
+      default:
+        fechaInicio = '1970-01-01';
+    }
+    
+    const ingresos = get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
+      WHERE tipo = 'ingreso' AND fecha >= ?`, [fechaInicio]).total;
+    
+    const egresos = get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
+      WHERE tipo = 'egreso' AND fecha >= ?`, [fechaInicio]).total;
+    
+    return {
+      periodo,
+      ingresos,
+      egresos,
+      balance: ingresos - egresos,
+      fecha_inicio: fechaInicio
+    };
+  });
+
+  ipcMain.handle('finanzas:getTrabajosTerminados', async () => {
+    return query(`
+      SELECT t.*, c.nombre as cliente_nombre 
+      FROM trabajos t
+      LEFT JOIN clientes c ON t.cliente_id = c.id
+      WHERE t.estado = 'terminado' AND t.id NOT IN (
+        SELECT trabajo_id FROM ventas WHERE trabajo_id IS NOT NULL
+      )
+      ORDER BY t.fecha_entrega_estimada ASC
     `);
   });
 

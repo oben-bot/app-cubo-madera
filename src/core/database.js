@@ -162,6 +162,48 @@ function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (trabajo_id) REFERENCES trabajos(id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS ventas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folio TEXT UNIQUE,
+        trabajo_id INTEGER,
+        cliente_id INTEGER NOT NULL,
+        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+        subtotal REAL DEFAULT 0,
+        iva REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        metodo_pago TEXT DEFAULT 'efectivo',
+        referencia_pago TEXT,
+        notas TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (trabajo_id) REFERENCES trabajos(id),
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+      );
+      
+      CREATE TABLE IF NOT EXISTS ventas_detalle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venta_id INTEGER NOT NULL,
+        producto_id INTEGER,
+        descripcion TEXT NOT NULL,
+        cantidad REAL DEFAULT 1,
+        precio_unitario REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES inventario(id)
+      );
+      
+      CREATE TABLE IF NOT EXISTS finanzas_movimientos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT NOT NULL, -- 'ingreso', 'egreso'
+        categoria TEXT, -- 'venta', 'compra_material', 'gasto_operativo', 'salario'
+        monto REAL NOT NULL,
+        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+        referencia_id INTEGER, -- ID de venta, compra, etc.
+        referencia_tipo TEXT,
+        descripcion TEXT,
+        usuario TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
       
       CREATE INDEX IF NOT EXISTS idx_inventario_nombre ON inventario(nombre);
       CREATE INDEX IF NOT EXISTS idx_inventario_categoria ON inventario(categoria);
@@ -176,6 +218,10 @@ function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_trabajos_fecha_inicio ON trabajos(fecha_inicio);
       CREATE INDEX IF NOT EXISTS idx_trabajos_numero ON trabajos(numero_trabajo);
       CREATE INDEX IF NOT EXISTS idx_evidencias_trabajo ON evidencias(trabajo_id);
+      CREATE INDEX IF NOT EXISTS idx_ventas_cliente ON ventas(cliente_id);
+      CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha);
+      CREATE INDEX IF NOT EXISTS idx_finanzas_fecha ON finanzas_movimientos(fecha);
+      CREATE INDEX IF NOT EXISTS idx_finanzas_tipo ON finanzas_movimientos(tipo);
     `);
 
     // Insertar valores por defecto de configuración
