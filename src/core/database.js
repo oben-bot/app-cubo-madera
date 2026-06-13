@@ -79,21 +79,54 @@ function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS movimientos_inventario (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         producto_id INTEGER NOT NULL,
-        tipo TEXT NOT NULL, -- 'entrada', 'salida', 'ajuste'
+        tipo TEXT NOT NULL,
         cantidad REAL NOT NULL,
-        motivo TEXT, -- 'compra', 'produccion', 'venta', 'merma', 'ajuste'
-        referencia_id INTEGER, -- ID del trabajo, cotización o venta
-        referencia_tipo TEXT, -- 'trabajo', 'venta', 'compra'
+        motivo TEXT,
+        referencia_id INTEGER,
+        referencia_tipo TEXT,
         usuario TEXT,
         notas TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (producto_id) REFERENCES inventario(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS cotizaciones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folio TEXT UNIQUE,
+        cliente_id INTEGER NOT NULL,
+        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+        validez_dias INTEGER DEFAULT 15,
+        subtotal REAL DEFAULT 0,
+        iva REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        estado TEXT DEFAULT 'pendiente',
+        notas TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+      );
+      
+      CREATE TABLE IF NOT EXISTS cotizaciones_detalle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cotizacion_id INTEGER NOT NULL,
+        tipo TEXT DEFAULT 'producto',
+        referencia_id INTEGER,
+        descripcion TEXT NOT NULL,
+        cantidad REAL DEFAULT 1,
+        precio_unitario REAL DEFAULT 0,
+        descuento REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        FOREIGN KEY (cotizacion_id) REFERENCES cotizaciones(id) ON DELETE CASCADE
       );
       
       CREATE INDEX IF NOT EXISTS idx_inventario_nombre ON inventario(nombre);
       CREATE INDEX IF NOT EXISTS idx_inventario_categoria ON inventario(categoria);
       CREATE INDEX IF NOT EXISTS idx_movimientos_producto ON movimientos_inventario(producto_id);
       CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos_inventario(created_at);
+      CREATE INDEX IF NOT EXISTS idx_cotizaciones_cliente ON cotizaciones(cliente_id);
+      CREATE INDEX IF NOT EXISTS idx_cotizaciones_fecha ON cotizaciones(fecha);
+      CREATE INDEX IF NOT EXISTS idx_cotizaciones_estado ON cotizaciones(estado);
+      CREATE INDEX IF NOT EXISTS idx_cotizaciones_detalle_cotizacion ON cotizaciones_detalle(cotizacion_id);
     `);
 
     // Insertar valores por defecto de configuración

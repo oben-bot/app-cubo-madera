@@ -30,6 +30,16 @@ contextBridge.exposeInMainWorld('electron', {
     getMovimientos: (productoId) => ipcRenderer.invoke('inventario:getMovimientos', productoId),
     getAlertasStock: () => ipcRenderer.invoke('inventario:getAlertasStock')
   },
+  // Cotizaciones
+  cotizaciones: {
+    getAll: () => ipcRenderer.invoke('cotizaciones:getAll'),
+    getById: (id) => ipcRenderer.invoke('cotizaciones:getById', id),
+    create: (cotizacion) => ipcRenderer.invoke('cotizaciones:create', cotizacion),
+    update: (id, cotizacion) => ipcRenderer.invoke('cotizaciones:update', id, cotizacion),
+    changeStatus: (id, estado) => ipcRenderer.invoke('cotizaciones:changeStatus', id, estado),
+    delete: (id) => ipcRenderer.invoke('cotizaciones:delete', id),
+    getProductosDisponibles: () => ipcRenderer.invoke('cotizaciones:getProductosDisponibles')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),
