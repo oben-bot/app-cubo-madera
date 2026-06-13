@@ -19,6 +19,17 @@ contextBridge.exposeInMainWorld('electron', {
     get: (key) => ipcRenderer.invoke('config:get', key),
     set: (key, value) => ipcRenderer.invoke('config:set', key, value)
   },
+  // Inventario
+  inventario: {
+    getAll: () => ipcRenderer.invoke('inventario:getAll'),
+    getById: (id) => ipcRenderer.invoke('inventario:getById', id),
+    create: (producto) => ipcRenderer.invoke('inventario:create', producto),
+    update: (id, producto) => ipcRenderer.invoke('inventario:update', id, producto),
+    delete: (id) => ipcRenderer.invoke('inventario:delete', id),
+    registrarMovimiento: (movimiento) => ipcRenderer.invoke('inventario:registrarMovimiento', movimiento),
+    getMovimientos: (productoId) => ipcRenderer.invoke('inventario:getMovimientos', productoId),
+    getAlertasStock: () => ipcRenderer.invoke('inventario:getAlertasStock')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),

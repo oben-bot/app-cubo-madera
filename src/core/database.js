@@ -57,9 +57,46 @@ function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS inventario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo TEXT UNIQUE,
+        nombre TEXT NOT NULL,
+        categoria TEXT DEFAULT 'material',
+        tipo TEXT DEFAULT 'materia_prima',
+        cantidad REAL DEFAULT 0,
+        unidad TEXT DEFAULT 'unidad',
+        stock_minimo REAL DEFAULT 0,
+        ubicacion TEXT,
+        proveedor TEXT,
+        precio_compra REAL DEFAULT 0,
+        precio_venta REAL DEFAULT 0,
+        notas TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS movimientos_inventario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL, -- 'entrada', 'salida', 'ajuste'
+        cantidad REAL NOT NULL,
+        motivo TEXT, -- 'compra', 'produccion', 'venta', 'merma', 'ajuste'
+        referencia_id INTEGER, -- ID del trabajo, cotización o venta
+        referencia_tipo TEXT, -- 'trabajo', 'venta', 'compra'
+        usuario TEXT,
+        notas TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (producto_id) REFERENCES inventario(id)
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_inventario_nombre ON inventario(nombre);
+      CREATE INDEX IF NOT EXISTS idx_inventario_categoria ON inventario(categoria);
+      CREATE INDEX IF NOT EXISTS idx_movimientos_producto ON movimientos_inventario(producto_id);
+      CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos_inventario(created_at);
     `);
 
-    // Insertar valores por defecto
+    // Insertar valores por defecto de configuración
     const defaultConfigs = [
       ['theme', 'system'],
       ['language', 'es'],
@@ -84,6 +121,26 @@ function initializeDatabase() {
     for (const modulo of defaultBgModules) {
       insertBg.run(modulo);
     }
+
+    // Insertar productos de ejemplo
+    const count = db.prepare('SELECT COUNT(*) as total FROM inventario').get();
+    if (count.total === 0) {
+      const sampleProducts = [
+        ['MDF-3MM', 'MDF 3mm', 'material', 'materia_prima', 100, 'plancha', 20, 'Estante A1', 'Maderas Lopez', 45, 80, 'MDF estándar 3mm'],
+        ['MDF-6MM', 'MDF 6mm', 'material', 'materia_prima', 50, 'plancha', 10, 'Estante A2', 'Maderas Lopez', 75, 120, 'MDF estándar 6mm'],
+        ['ACR-3MM', 'Acrílico Transparente 3mm', 'material', 'materia_prima', 30, 'plancha', 5, 'Estante B1', 'Acrilicos SA', 120, 200, 'Acrílico cristal'],
+        ['LAM-HEXA', 'Lámpara Hexágono', 'producto', 'producto_terminado', 15, 'unidad', 5, 'Estante C1', null, 0, 350, 'Lámpara decorativa'],
+        ['LLAV-CUBO', 'Llavero Cubo', 'producto', 'producto_terminado', 50, 'unidad', 10, 'Estante C2', null, 0, 80, 'Llavero acrílico'],
+      ];
+      
+      const insertStmt = db.prepare(`INSERT INTO inventario 
+        (codigo, nombre, categoria, tipo, cantidad, unidad, stock_minimo, ubicacion, proveedor, precio_compra, precio_venta, notas) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      
+      for (const product of sampleProducts) {
+        insertStmt.run(product);
+      }
+    }
   }
 }
 
@@ -102,9 +159,14 @@ function get(sql, params = []) {
   return db.prepare(sql).get(params);
 }
 
+function getDb() {
+  return db;
+}
+
 module.exports = {
   initializeDatabase,
   query,
   run,
   get,
+  getDb,
 };
