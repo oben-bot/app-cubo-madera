@@ -1,6 +1,7 @@
 const { initializeDatabase, query, run, get, getDb } = require('./database');
 const fs = require('fs').promises;
 const path = require('path');
+const bibliotecaBridge = require('./bibliotecaBridge');
 
 // Funciones para generar folios y números únicos
 const generarFolio = () => {
@@ -723,6 +724,34 @@ function registerIpcHandlers(ipcMain, mainWindow) {
 
   ipcMain.handle('marketing:getExportaciones', async (_, limit = 50) => {
     return query('SELECT * FROM exportaciones ORDER BY created_at DESC LIMIT ?', [limit]);
+  });
+
+  // ==================== BIBLIOTECA LASER HANDLERS ====================
+
+  ipcMain.handle('biblioteca:getStatus', async () => {
+    const bibPath = await bibliotecaBridge.findBiblioteca();
+    const isConnected = await bibliotecaBridge.checkConnection();
+    return { instalada: !!bibPath, conectada: isConnected, ruta: bibPath };
+  });
+
+  ipcMain.handle('biblioteca:start', async () => {
+    return await bibliotecaBridge.startBiblioteca();
+  });
+
+  ipcMain.handle('biblioteca:getDisenos', async (_, categoria) => {
+    return await bibliotecaBridge.getDisenos(categoria);
+  });
+
+  ipcMain.handle('biblioteca:getDisenoById', async (_, id) => {
+    return await bibliotecaBridge.getDisenoById(id);
+  });
+
+  ipcMain.handle('biblioteca:copiarDiseno', async (_, disenoId, trabajoId) => {
+    return await bibliotecaBridge.copiarDisenoParaProduccion(disenoId, trabajoId);
+  });
+
+  ipcMain.handle('biblioteca:syncProductos', async () => {
+    return await bibliotecaBridge.syncProductosToBiblioteca();
   });
 
   // Ventana
