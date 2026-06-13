@@ -567,6 +567,96 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     `);
   });
 
+  // ==================== CALENDARIO HANDLERS ====================
+
+  ipcMain.handle('calendario:getEventos', async (_, fechaInicio, fechaFin) => {
+    return query(`
+      SELECT * FROM calendario_eventos 
+      WHERE fecha_inicio BETWEEN ? AND ?
+      ORDER BY fecha_inicio ASC
+    `, [fechaInicio, fechaFin]);
+  });
+
+  ipcMain.handle('calendario:getAll', async () => {
+    return query('SELECT * FROM calendario_eventos ORDER BY fecha_inicio DESC LIMIT 200');
+  });
+
+  ipcMain.handle('calendario:create', async (_, evento) => {
+    const result = run(`INSERT INTO calendario_eventos 
+      (titulo, descripcion, tipo, referencia_id, fecha_inicio, fecha_fin, color, recordatorio_minutos) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+      evento.titulo, evento.descripcion, evento.tipo, evento.referencia_id,
+      evento.fecha_inicio, evento.fecha_fin, evento.color, evento.recordatorio_minutos || 0
+    ]);
+    return { id: result.lastInsertRowid };
+  });
+
+  ipcMain.handle('calendario:update', async (_, id, evento) => {
+    run(`UPDATE calendario_eventos SET 
+      titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, color = ?, 
+      recordatorio_minutos = ?, completado = ?
+      WHERE id = ?`, [
+      evento.titulo, evento.descripcion, evento.fecha_inicio, evento.fecha_fin,
+      evento.color, evento.recordatorio_minutos, evento.completado ? 1 : 0, id
+    ]);
+    return { success: true };
+  });
+
+  ipcMain.handle('calendario:delete', async (_, id) => {
+    const result = run('DELETE FROM calendario_eventos WHERE id = ?', [id]);
+    return { success: result.changes > 0 };
+  });
+
+  ipcMain.handle('calendario:syncTrabajos', async () => {
+    const trabajos = query(`
+      SELECT id, numero_trabajo, titulo, fecha_inicio, fecha_entrega_estimada, estado 
+      FROM trabajos 
+      WHERE fecha_inicio IS NOT NULL OR fecha_entrega_estimada IS NOT NULL
+    `);
+    
+    for (const trabajo of trabajos) {
+      if (trabajo.fecha_inicio) {
+        const existe = get(`SELECT id FROM calendario_eventos 
+          WHERE tipo = 'trabajo' AND referencia_id = ? AND fecha_inicio = ?`,
+          [trabajo.id, trabajo.fecha_inicio]);
+        
+        if (!existe) {
+          run(`INSERT INTO calendario_eventos 
+            (titulo, descripcion, tipo, referencia_id, fecha_inicio, color) 
+            VALUES (?, ?, 'trabajo', ?, ?, '#3b82f6')`,
+            [`Inicio: ${trabajo.numero_trabajo}`, trabajo.titulo, trabajo.id, trabajo.fecha_inicio]);
+        }
+      }
+      
+      if (trabajo.fecha_entrega_estimada) {
+        const existe = get(`SELECT id FROM calendario_eventos 
+          WHERE tipo = 'trabajo' AND referencia_id = ? AND fecha_inicio = ? AND titulo LIKE 'Entrega%'`,
+          [trabajo.id, trabajo.fecha_entrega_estimada]);
+        
+        if (!existe) {
+          run(`INSERT INTO calendario_eventos 
+            (titulo, descripcion, tipo, referencia_id, fecha_inicio, color, recordatorio_minutos) 
+            VALUES (?, ?, 'trabajo', ?, ?, '#f59e0b', 1440)`,
+            [`Entrega: ${trabajo.numero_trabajo}`, trabajo.titulo, trabajo.id, trabajo.fecha_entrega_estimada]);
+        }
+      }
+    }
+    return { success: true, sincronizados: trabajos.length };
+  });
+
+  ipcMain.handle('calendario:getEventosHoy', async () => {
+    const hoyInicio = new Date();
+    hoyInicio.setHours(0, 0, 0, 0);
+    const hoyFin = new Date();
+    hoyFin.setHours(23, 59, 59, 999);
+    
+    return query(`
+      SELECT * FROM calendario_eventos 
+      WHERE fecha_inicio BETWEEN ? AND ?
+      ORDER BY fecha_inicio ASC
+    `, [hoyInicio.toISOString(), hoyFin.toISOString()]);
+  });
+
   // Ventana
   ipcMain.on('window:close', () => {
     if (mainWindow) mainWindow.close();

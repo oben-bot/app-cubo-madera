@@ -204,6 +204,20 @@ function initializeDatabase() {
         usuario TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS calendario_eventos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT NOT NULL,
+        descripcion TEXT,
+        tipo TEXT NOT NULL, -- 'trabajo', 'cotizacion', 'recordatorio', 'personal'
+        referencia_id INTEGER, -- ID del trabajo, cotización, etc.
+        fecha_inicio DATETIME NOT NULL,
+        fecha_fin DATETIME,
+        color TEXT,
+        recordatorio_minutos INTEGER DEFAULT 0,
+        completado BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
       
       CREATE INDEX IF NOT EXISTS idx_inventario_nombre ON inventario(nombre);
       CREATE INDEX IF NOT EXISTS idx_inventario_categoria ON inventario(categoria);
@@ -222,6 +236,8 @@ function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha);
       CREATE INDEX IF NOT EXISTS idx_finanzas_fecha ON finanzas_movimientos(fecha);
       CREATE INDEX IF NOT EXISTS idx_finanzas_tipo ON finanzas_movimientos(tipo);
+      CREATE INDEX IF NOT EXISTS idx_calendario_fecha ON calendario_eventos(fecha_inicio);
+      CREATE INDEX IF NOT EXISTS idx_calendario_tipo ON calendario_eventos(tipo);
     `);
 
     // Insertar valores por defecto de configuración

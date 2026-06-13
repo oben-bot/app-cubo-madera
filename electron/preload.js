@@ -70,6 +70,16 @@ contextBridge.exposeInMainWorld('electron', {
     getResumen: (periodo) => ipcRenderer.invoke('finanzas:getResumen', periodo),
     getTrabajosTerminados: () => ipcRenderer.invoke('finanzas:getTrabajosTerminados')
   },
+  // Calendario
+  calendario: {
+    getEventos: (fechaInicio, fechaFin) => ipcRenderer.invoke('calendario:getEventos', fechaInicio, fechaFin),
+    getAll: () => ipcRenderer.invoke('calendario:getAll'),
+    create: (evento) => ipcRenderer.invoke('calendario:create', evento),
+    update: (id, evento) => ipcRenderer.invoke('calendario:update', id, evento),
+    delete: (id) => ipcRenderer.invoke('calendario:delete', id),
+    syncTrabajos: () => ipcRenderer.invoke('calendario:syncTrabajos'),
+    getEventosHoy: () => ipcRenderer.invoke('calendario:getEventosHoy')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),
