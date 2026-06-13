@@ -118,6 +118,50 @@ function initializeDatabase() {
         total REAL DEFAULT 0,
         FOREIGN KEY (cotizacion_id) REFERENCES cotizaciones(id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS trabajos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_trabajo TEXT UNIQUE,
+        cotizacion_id INTEGER,
+        cliente_id INTEGER NOT NULL,
+        titulo TEXT NOT NULL,
+        descripcion TEXT,
+        estado TEXT DEFAULT 'en_cola',
+        prioridad INTEGER DEFAULT 1,
+        fecha_inicio DATETIME,
+        fecha_entrega_estimada DATETIME,
+        fecha_entrega_real DATETIME,
+        materiales_usados TEXT,
+        costo_materiales REAL DEFAULT 0,
+        costo_mano_obra REAL DEFAULT 0,
+        precio_total REAL DEFAULT 0,
+        ganancia REAL DEFAULT 0,
+        notas TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cotizacion_id) REFERENCES cotizaciones(id),
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+      );
+      
+      CREATE TABLE IF NOT EXISTS evidencias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trabajo_id INTEGER NOT NULL,
+        tipo TEXT DEFAULT 'imagen',
+        archivo_ruta TEXT NOT NULL,
+        descripcion TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (trabajo_id) REFERENCES trabajos(id) ON DELETE CASCADE
+      );
+      
+      CREATE TABLE IF NOT EXISTS trabajo_actividades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trabajo_id INTEGER NOT NULL,
+        actividad TEXT NOT NULL,
+        usuario TEXT,
+        duracion_minutos INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (trabajo_id) REFERENCES trabajos(id) ON DELETE CASCADE
+      );
       
       CREATE INDEX IF NOT EXISTS idx_inventario_nombre ON inventario(nombre);
       CREATE INDEX IF NOT EXISTS idx_inventario_categoria ON inventario(categoria);
@@ -127,6 +171,11 @@ function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_cotizaciones_fecha ON cotizaciones(fecha);
       CREATE INDEX IF NOT EXISTS idx_cotizaciones_estado ON cotizaciones(estado);
       CREATE INDEX IF NOT EXISTS idx_cotizaciones_detalle_cotizacion ON cotizaciones_detalle(cotizacion_id);
+      CREATE INDEX IF NOT EXISTS idx_trabajos_cliente ON trabajos(cliente_id);
+      CREATE INDEX IF NOT EXISTS idx_trabajos_estado ON trabajos(estado);
+      CREATE INDEX IF NOT EXISTS idx_trabajos_fecha_inicio ON trabajos(fecha_inicio);
+      CREATE INDEX IF NOT EXISTS idx_trabajos_numero ON trabajos(numero_trabajo);
+      CREATE INDEX IF NOT EXISTS idx_evidencias_trabajo ON evidencias(trabajo_id);
     `);
 
     // Insertar valores por defecto de configuración

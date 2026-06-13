@@ -2,13 +2,21 @@ const { initializeDatabase, query, run, get, getDb } = require('./database');
 const fs = require('fs').promises;
 const path = require('path');
 
-// Función para generar folio único
+// Funciones para generar folios y números únicos
 const generarFolio = () => {
   const fecha = new Date();
   const año = fecha.getFullYear();
   const mes = String(fecha.getMonth() + 1).padStart(2, '0');
   const numero = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
   return `COT-${año}${mes}-${numero}`;
+};
+
+const generarNumeroTrabajo = () => {
+  const fecha = new Date();
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const count = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `TR-${año}${mes}-${count}`;
 };
 
 function registerIpcHandlers(ipcMain, mainWindow) {
@@ -226,6 +234,168 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     return query(`SELECT id, nombre, codigo, precio_venta, unidad FROM inventario 
       WHERE tipo IN ('producto_terminado', 'materia_prima') AND cantidad > 0
       ORDER BY nombre`);
+  });
+
+  // ==================== PRODUCCIÓN HANDLERS ====================
+
+  ipcMain.handle('trabajos:getAll', async () => {
+    return query(`
+      SELECT t.*, c.nombre as cliente_nombre, c.telefono,
+             cot.folio as cotizacion_folio
+      FROM trabajos t
+      LEFT JOIN clientes c ON t.cliente_id = c.id
+      LEFT JOIN cotizaciones cot ON t.cotizacion_id = cot.id
+      ORDER BY 
+        CASE t.estado 
+          WHEN 'en_cola' THEN 1
+          WHEN 'en_proceso' THEN 2
+          WHEN 'terminado' THEN 3
+          WHEN 'entregado' THEN 4
+          ELSE 5
+        END,
+        t.prioridad DESC,
+        t.created_at ASC
+    `);
+  });
+
+  ipcMain.handle('trabajos:getByEstado', async (_, estado) => {
+    return query(`
+      SELECT t.*, c.nombre as cliente_nombre 
+      FROM trabajos t
+      LEFT JOIN clientes c ON t.cliente_id = c.id
+      WHERE t.estado = ?
+      ORDER BY t.prioridad DESC, t.created_at ASC
+    `, [estado]);
+  });
+
+  ipcMain.handle('trabajos:getById', async (_, id) => {
+    const trabajo = get(`
+      SELECT t.*, c.nombre as cliente_nombre, c.telefono, c.email
+      FROM trabajos t
+      LEFT JOIN clientes c ON t.cliente_id = c.id
+      WHERE t.id = ?
+    `, [id]);
+    
+    if (trabajo) {
+      trabajo.evidencias = query('SELECT * FROM evidencias WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
+      trabajo.actividades = query('SELECT * FROM trabajo_actividades WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
+    }
+    return trabajo;
+  });
+
+  ipcMain.handle('trabajos:crearDesdeCotizacion', async (_, cotizacionId) => {
+    const cotizacion = get(`
+      SELECT c.*, cl.nombre as cliente_nombre 
+      FROM cotizaciones c
+      LEFT JOIN clientes cl ON c.cliente_id = cl.id
+      WHERE c.id = ?
+    `, [cotizacionId]);
+    
+    if (!cotizacion) throw new Error('Cotización no encontrada');
+    
+    const numeroTrabajo = generarNumeroTrabajo();
+    const fechaEstimada = new Date();
+    fechaEstimada.setDate(fechaEstimada.getDate() + (cotizacion.validez_dias || 15));
+    
+    const result = run(`INSERT INTO trabajos 
+      (numero_trabajo, cotizacion_id, cliente_id, titulo, descripcion, 
+       estado, fecha_entrega_estimada, precio_total, notas) 
+      VALUES (?, ?, ?, ?, ?, 'en_cola', ?, ?, ?)`, [
+      numeroTrabajo, cotizacionId, cotizacion.cliente_id,
+      `Trabajo desde cotización ${cotizacion.folio}`,
+      cotizacion.notas, fechaEstimada.toISOString(),
+      cotizacion.total, `Trabajo generado desde cotización ${cotizacion.folio}`
+    ]);
+    
+    run('UPDATE cotizaciones SET estado = "convertida", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cotizacionId]);
+    
+    return { id: result.lastInsertRowid, numero_trabajo: numeroTrabajo };
+  });
+
+  ipcMain.handle('trabajos:create', async (_, trabajo) => {
+    const numeroTrabajo = generarNumeroTrabajo();
+    const result = run(`INSERT INTO trabajos 
+      (numero_trabajo, cliente_id, titulo, descripcion, estado, prioridad,
+       fecha_entrega_estimada, costo_materiales, costo_mano_obra, precio_total, notas) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      numeroTrabajo, trabajo.cliente_id, trabajo.titulo, trabajo.descripcion,
+      trabajo.estado || 'en_cola', trabajo.prioridad || 1,
+      trabajo.fecha_entrega_estimada, trabajo.costo_materiales || 0,
+      trabajo.costo_mano_obra || 0, trabajo.precio_total || 0,
+      trabajo.notas
+    ]);
+    return { id: result.lastInsertRowid, numero_trabajo: numeroTrabajo };
+  });
+
+  ipcMain.handle('trabajos:update', async (_, id, trabajo) => {
+    run(`UPDATE trabajos SET 
+      titulo = ?, descripcion = ?, estado = ?, prioridad = ?,
+      fecha_inicio = ?, fecha_entrega_estimada = ?, fecha_entrega_real = ?,
+      costo_materiales = ?, costo_mano_obra = ?, precio_total = ?,
+      ganancia = ?, notas = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`, [
+      trabajo.titulo, trabajo.descripcion, trabajo.estado, trabajo.prioridad,
+      trabajo.fecha_inicio, trabajo.fecha_entrega_estimada, trabajo.fecha_entrega_real,
+      trabajo.costo_materiales, trabajo.costo_mano_obra, trabajo.precio_total,
+      trabajo.ganancia, trabajo.notas, id
+    ]);
+    return { success: true };
+  });
+
+  ipcMain.handle('trabajos:changeStatus', async (_, id, nuevoEstado) => {
+    const updates = { estado: nuevoEstado, updated_at: new Date().toISOString() };
+    const current = get('SELECT fecha_inicio FROM trabajos WHERE id = ?', [id]);
+    
+    if (nuevoEstado === 'en_proceso' && !current.fecha_inicio) {
+      updates.fecha_inicio = new Date().toISOString();
+    }
+    if (nuevoEstado === 'entregado') {
+      updates.fecha_entrega_real = new Date().toISOString();
+    }
+    
+    const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const values = [...Object.values(updates), id];
+    
+    run(`UPDATE trabajos SET ${setClause} WHERE id = ?`, values);
+    
+    run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, usuario) VALUES (?, ?, ?)`,
+      [id, `Estado cambiado a ${nuevoEstado}`, 'sistema']);
+    
+    return { success: true };
+  });
+
+  ipcMain.handle('trabajos:addEvidencia', async (_, trabajoId, archivoPath, descripcion) => {
+    const result = run(`INSERT INTO evidencias (trabajo_id, archivo_ruta, descripcion) VALUES (?, ?, ?)`,
+      [trabajoId, archivoPath, descripcion]);
+    return { id: result.lastInsertRowid };
+  });
+
+  ipcMain.handle('trabajos:deleteEvidencia', async (_, id) => {
+    const result = run('DELETE FROM evidencias WHERE id = ?', [id]);
+    return { success: result.changes > 0 };
+  });
+
+  ipcMain.handle('trabajos:addActividad', async (_, trabajoId, actividad, duracion) => {
+    run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, duracion_minutos, usuario) VALUES (?, ?, ?, ?)`,
+      [trabajoId, actividad, duracion, 'usuario']);
+    return { success: true };
+  });
+
+  ipcMain.handle('trabajos:delete', async (_, id) => {
+    const result = run('DELETE FROM trabajos WHERE id = ?', [id]);
+    return { success: result.changes > 0 };
+  });
+
+  ipcMain.handle('trabajos:getCotizacionesAprobadas', async () => {
+    return query(`
+      SELECT c.*, cl.nombre as cliente_nombre 
+      FROM cotizaciones c
+      LEFT JOIN clientes cl ON c.cliente_id = cl.id
+      WHERE c.estado = 'aprobada' AND c.id NOT IN (
+        SELECT cotizacion_id FROM trabajos WHERE cotizacion_id IS NOT NULL
+      )
+      ORDER BY c.fecha DESC
+    `);
   });
 
   // Ventana

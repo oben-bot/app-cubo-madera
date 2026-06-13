@@ -40,6 +40,21 @@ contextBridge.exposeInMainWorld('electron', {
     delete: (id) => ipcRenderer.invoke('cotizaciones:delete', id),
     getProductosDisponibles: () => ipcRenderer.invoke('cotizaciones:getProductosDisponibles')
   },
+  // Producción
+  trabajos: {
+    getAll: () => ipcRenderer.invoke('trabajos:getAll'),
+    getByEstado: (estado) => ipcRenderer.invoke('trabajos:getByEstado', estado),
+    getById: (id) => ipcRenderer.invoke('trabajos:getById', id),
+    crearDesdeCotizacion: (cotizacionId) => ipcRenderer.invoke('trabajos:crearDesdeCotizacion', cotizacionId),
+    create: (trabajo) => ipcRenderer.invoke('trabajos:create', trabajo),
+    update: (id, trabajo) => ipcRenderer.invoke('trabajos:update', id, trabajo),
+    changeStatus: (id, estado) => ipcRenderer.invoke('trabajos:changeStatus', id, estado),
+    addEvidencia: (trabajoId, archivoPath, descripcion) => ipcRenderer.invoke('trabajos:addEvidencia', trabajoId, archivoPath, descripcion),
+    deleteEvidencia: (id) => ipcRenderer.invoke('trabajos:deleteEvidencia', id),
+    addActividad: (trabajoId, actividad, duracion) => ipcRenderer.invoke('trabajos:addActividad', trabajoId, actividad, duracion),
+    delete: (id) => ipcRenderer.invoke('trabajos:delete', id),
+    getCotizacionesAprobadas: () => ipcRenderer.invoke('trabajos:getCotizacionesAprobadas')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),
