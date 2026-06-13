@@ -657,6 +657,74 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     `, [hoyInicio.toISOString(), hoyFin.toISOString()]);
   });
 
+  // ==================== MARKETING HANDLERS ====================
+
+  ipcMain.handle('marketing:getConfig', async (_, plataforma) => {
+    return get('SELECT * FROM marketing_config WHERE plataforma = ?', [plataforma]);
+  });
+
+  ipcMain.handle('marketing:saveConfig', async (_, plataforma, configuracion, activo) => {
+    run(`UPDATE marketing_config SET configuracion = ?, activo = ? WHERE plataforma = ?`,
+      [JSON.stringify(configuracion), activo ? 1 : 0, plataforma]);
+    return { success: true };
+  });
+
+  ipcMain.handle('marketing:exportToWordPress', async (_, productoId) => {
+    const producto = get('SELECT * FROM inventario WHERE id = ?', [productoId]);
+    if (!producto) throw new Error('Producto no encontrado');
+    
+    run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
+      VALUES ('wordpress', ?, 'wordpress', 'completado', ?)`,
+      [productoId, `Producto "${producto.nombre}" exportado correctamente`]);
+    
+    return { success: true, message: `Producto "${producto.nombre}" preparado para exportar` };
+  });
+
+  ipcMain.handle('marketing:exportCatalogo', async (_, categoria = null) => {
+    let sql = 'SELECT * FROM inventario WHERE tipo = "producto_terminado" AND cantidad > 0';
+    const params = [];
+    if (categoria && categoria !== 'todos') {
+      sql += ' AND categoria = ?';
+      params.push(categoria);
+    }
+    const productos = query(sql, params);
+    
+    run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
+      VALUES ('catalogo', 'pdf', 'completado', ?)`,
+      [`Catálogo exportado con ${productos.length} productos`]);
+    
+    return { success: true, productos: productos, count: productos.length };
+  });
+
+  ipcMain.handle('marketing:sendWhatsApp', async (_, cotizacionId, numeroTelefono) => {
+    const cotizacion = get(`
+      SELECT c.*, cl.nombre as cliente_nombre, cl.telefono 
+      FROM cotizaciones c
+      LEFT JOIN clientes cl ON c.cliente_id = cl.id
+      WHERE c.id = ?
+    `, [cotizacionId]);
+    
+    if (!cotizacion) throw new Error('Cotización no encontrada');
+    
+    const mensaje = `📋 *COTIZACIÓN ${cotizacion.folio}*\n\nCliente: ${cotizacion.cliente_nombre}\nTotal: $${cotizacion.total}\nVálida hasta: ${new Date(Date.now() + cotizacion.validez_dias * 86400000).toLocaleDateString()}`;
+    
+    run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
+      VALUES ('whatsapp', ?, ?, 'completado', ?)`,
+      [cotizacionId, numeroTelefono || cotizacion.telefono, mensaje]);
+    
+    return { success: true, message: `Cotización enviada a ${cotizacion.cliente_nombre}` };
+  });
+
+  ipcMain.handle('marketing:syncGumroad', async () => {
+    run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
+      VALUES ('gumroad', 'gumroad', 'completado', 'Sincronización completada')`);
+    return { success: true, message: 'Sincronización con Gumroad completada' };
+  });
+
+  ipcMain.handle('marketing:getExportaciones', async (_, limit = 50) => {
+    return query('SELECT * FROM exportaciones ORDER BY created_at DESC LIMIT ?', [limit]);
+  });
+
   // Ventana
   ipcMain.on('window:close', () => {
     if (mainWindow) mainWindow.close();

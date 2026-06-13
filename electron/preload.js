@@ -80,6 +80,16 @@ contextBridge.exposeInMainWorld('electron', {
     syncTrabajos: () => ipcRenderer.invoke('calendario:syncTrabajos'),
     getEventosHoy: () => ipcRenderer.invoke('calendario:getEventosHoy')
   },
+  // Marketing
+  marketing: {
+    getConfig: (plataforma) => ipcRenderer.invoke('marketing:getConfig', plataforma),
+    saveConfig: (plataforma, configuracion, activo) => ipcRenderer.invoke('marketing:saveConfig', plataforma, configuracion, activo),
+    exportToWordPress: (productoId) => ipcRenderer.invoke('marketing:exportToWordPress', productoId),
+    exportCatalogo: (categoria) => ipcRenderer.invoke('marketing:exportCatalogo', categoria),
+    sendWhatsApp: (cotizacionId, numeroTelefono) => ipcRenderer.invoke('marketing:sendWhatsApp', cotizacionId, numeroTelefono),
+    syncGumroad: () => ipcRenderer.invoke('marketing:syncGumroad'),
+    getExportaciones: (limit) => ipcRenderer.invoke('marketing:getExportaciones', limit)
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),
