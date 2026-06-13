@@ -1,137 +1,66 @@
+const { initializeDatabase, query, run, get } = require('./database');
+const fs = require('fs').promises;
 const path = require('path');
-const {
-  initializeStorage,
-  listFolder,
-  copyFile,
-  moveFile,
-  deletePath,
-  optimizeImage,
-} = require('./fileSystem');
-const {
-  initializeDatabase,
-  getModuleItems,
-  saveModuleItem,
-  deleteModuleItem,
-  getLibraryItems,
-  saveLibraryItems,
-  getSettings,
-  saveSettings,
-} = require('./database');
 
 function registerIpcHandlers(ipcMain, mainWindow) {
-  initializeStorage();
   initializeDatabase();
 
-  ipcMain.handle('desktop/initialize', async () => ({ status: 'ok' }));
-
-  ipcMain.handle('desktop/list-folder', async (_, folderKey) => {
-    const folders = {
-      inventory: 'inventoryFolder',
-      catalog: 'catalogFolder',
-      sync: 'syncFolder',
-    };
-    const { [folders[folderKey]]: folderPath } = require('./config');
-    return listFolder(folderPath);
+  // Base de datos
+  ipcMain.handle('database:query', async (_, sql, params) => {
+    return query(sql, params);
   });
 
-  ipcMain.handle('desktop/copy-file', async (_, source, destination) => {
-    copyFile(source, destination);
-    return { status: 'copied' };
+  ipcMain.handle('database:run', async (_, sql, params) => {
+    return run(sql, params);
   });
 
-  ipcMain.handle('desktop/move-file', async (_, source, destination) => {
-    moveFile(source, destination);
-    return { status: 'moved' };
+  ipcMain.handle('database:get', async (_, sql, params) => {
+    return get(sql, params);
   });
 
-  ipcMain.handle('desktop/delete-path', async (_, targetPath) => {
-    deletePath(targetPath);
-    return { status: 'deleted' };
+  // Sistema de archivos
+  ipcMain.handle('fs:readFile', async (_, filePath) => {
+    return fs.readFile(filePath, 'utf-8');
   });
 
-  ipcMain.handle('desktop/optimize-image', async (_, source, destination, options) => {
-    return optimizeImage(source, destination, options);
+  ipcMain.handle('fs:writeFile', async (_, filePath, data) => {
+    await fs.writeFile(filePath, data);
+    return { success: true };
   });
 
-  ipcMain.handle('desktop/get-db-items', async (_, moduleName) => {
-    return getModuleItems(moduleName);
+  ipcMain.handle('fs:readDir', async (_, dirPath) => {
+    return fs.readdir(dirPath);
   });
 
-  ipcMain.handle('desktop/save-db-item', async (_, moduleName, item) => {
-    return saveModuleItem(moduleName, item);
+  // Configuración
+  ipcMain.handle('config:get', async (_, key) => {
+    const result = get('SELECT valor FROM configuraciones WHERE clave = ?', [key]);
+    return result ? result.valor : null;
   });
 
-  ipcMain.handle('desktop/delete-db-item', async (_, moduleName, id) => {
-    return deleteModuleItem(moduleName, id);
+  ipcMain.handle('config:set', async (_, key, value) => {
+    return run(
+      'INSERT OR REPLACE INTO configuraciones (clave, valor, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+      [key, value]
+    );
   });
 
-  ipcMain.handle('desktop/get-library', async () => {
-    return getLibraryItems();
+  // Ventana
+  ipcMain.on('window:close', () => {
+    if (mainWindow) mainWindow.close();
   });
 
-  ipcMain.handle('desktop/save-library', async (_, items) => {
-    saveLibraryItems(items);
-    return { status: 'saved' };
+  ipcMain.on('window:minimize', () => {
+    if (mainWindow) mainWindow.minimize();
   });
 
-  ipcMain.handle('desktop/get-settings', async () => getSettings());
-
-  ipcMain.handle('desktop/update-settings', async (_, settings) => {
-    saveSettings(settings);
-    return { status: 'saved' };
-  });
-
-  // === AUTHENTICATION HANDLERS ===
-  ipcMain.handle('save-auth', async (_, { email, theme }) => {
-    const settings = getSettings();
-    settings.email = email;
-    settings.theme = theme || 'dark';
-    settings.lastLogin = new Date().toISOString();
-    saveSettings(settings);
-    return { status: 'saved' };
-  });
-
-  ipcMain.handle('send-recovery-email', async (_, { email }) => {
-    // Implementación de envío de email (necesita configuración de SMTP)
-    console.log(`Recovery email requested for: ${email}`);
-    // TODO: Integrar nodemailer para envío real
-    return { status: 'pending', message: 'Email enviado (modo demo)' };
-  });
-
-  ipcMain.handle('verify-credentials', async (_, { email, password }) => {
-    // Validación básica (en producción, usar hash de contraseña en DB)
-    const DEFAULT_EMAIL = 'obenrojas@gmail.com';
-    const DEFAULT_PASSWORD = 'CuboManager2026';
-    
-    if (email === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
-      return { valid: true };
-    }
-    return { valid: false };
-  });
-
-  // === BIBLIOTECA LASER MINI-APP ===
-  ipcMain.handle('launch-mini-app', async (_, appPath) => {
-    const { spawn } = require('child_process');
-    const path = require('path');
-    
-    try {
-      // Validar que el archivo existe
-      const fs = require('fs');
-      if (!fs.existsSync(appPath)) {
-        return { success: false, error: 'Archivo no encontrado: ' + appPath };
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
       }
-
-      // Ejecutar el archivo .pyw con Python
-      const pythonProcess = spawn('python', [appPath], {
-        detached: true,
-        stdio: 'ignore'
-      });
-
-      pythonProcess.unref(); // Permitir que el proceso se ejecute independientemente
-      return { success: true, message: 'Mini-App iniciada' };
-    } catch (err) {
-      console.error('Error launching mini-app:', err);
-      return { success: false, error: err.message };
     }
   });
 }

@@ -1,0 +1,145 @@
+.onboarding-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.onboarding-wizard {
+  background: var(--card-bg);
+  border-radius: 24px;
+  width: 90%;
+  max-width: 600px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.onboarding-progress {
+  margin-bottom: 30px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: var(--primary-color);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  margin-bottom: 10px;
+}
+
+.onboarding-progress span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.onboarding-step {
+  min-height: 350px;
+}
+
+.onboarding-step h1, .onboarding-step h2 {
+  margin-bottom: 20px;
+}
+
+.onboarding-step p {
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-group select, .form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-color);
+}
+
+.theme-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.theme-buttons button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.theme-buttons button.selected {
+  background: var(--primary-color);
+  color: white;
+}
+
+.modules-grid-onboarding {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.modules-grid-onboarding label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--button-bg);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tips {
+  background: var(--button-bg);
+  padding: 15px;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.tips ul {
+  margin: 10px 0 0 20px;
+}
+
+.tips li {
+  margin: 5px 0;
+}
+
+.onboarding-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-secondary {
+  padding: 10px 24px;
+  background: var(--button-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  padding: 10px 24px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}

@@ -1,186 +1,195 @@
-import './ClientesMain.css';
 import React, { useState, useEffect } from 'react';
-import systemMonitor from '../../components/Core/SystemMonitor';
-import { deleteWithTrash } from '../../utils/deleteWithTrash';
+import './ClientesMain.css';
 
-const clientesFrecuentes = [
-  { nombre: "Maderas del Norte", area: "Producción" },
-  { nombre: "Tableros Express", area: "Producción" },
-  { nombre: "ConstruyeFácil", area: "Producción" },
-];
-
-const ClientesMain = ({ onBackToDashboard }) => {
-  const [activeTab, setActiveTab] = useState(null);
+const ClientesMain = () => {
   const [clientes, setClientes] = useState([]);
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre: "", correo: "", telefono: "" });
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingCliente, setEditingCliente] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    telefono: '',
+    email: '',
+    direccion: '',
+    notas: ''
+  });
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Monitoreo: Registrar render y evento de apertura
-  React.useEffect(() => {
-    systemMonitor.recordMetric('renders', Date.now());
-    systemMonitor.log('clientes_render', {});
+  // Cargar clientes al iniciar
+  useEffect(() => {
+    loadClientes();
   }, []);
 
-  // Cargar clientes desde localStorage al iniciar
-  useEffect(() => {
-    const guardados = localStorage.getItem("clientes");
-    if (guardados) setClientes(JSON.parse(guardados));
-  }, []);
-
-  // Guardar clientes en localStorage cada vez que cambian
-  useEffect(() => {
-    localStorage.setItem("clientes", JSON.stringify(clientes));
-  }, [clientes]);
-
-  const handleInputChange = e => {
-    setNuevoCliente({ ...nuevoCliente, [e.target.name]: e.target.value });
-  };
-
-  const handleAgregarCliente = e => {
-    e.preventDefault();
-    if (nuevoCliente.nombre.trim() === "") return;
-    setClientes([...clientes, { ...nuevoCliente }]);
-    setNuevoCliente({ nombre: "", correo: "", telefono: "" });
-  };
-
-  const handleEliminarCliente = idx => {
-    const cliente = clientes[idx];
-    deleteWithTrash({
-      id: `cliente-${idx}-${cliente.nombre}`,
-      name: cliente.nombre,
-      type: 'cliente'
-    });
-    setClientes(clientes.filter((_, i) => i !== idx));
-  };
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'registro':
-        return (
-          <div className="clientes-tab-content">
-            <h2>Registro de Clientes</h2>
-            <form onSubmit={handleAgregarCliente} style={{ marginBottom: 24 }}>
-              <input
-                type="text"
-                name="nombre"
-                placeholder="Nombre"
-                value={nuevoCliente.nombre}
-                onChange={handleInputChange}
-                required
-                className="input-cliente"
-              />
-              <input
-                type="email"
-                name="correo"
-                placeholder="Correo"
-                value={nuevoCliente.correo}
-                onChange={handleInputChange}
-                className="input-cliente"
-              />
-              <input
-                type="tel"
-                name="telefono"
-                placeholder="Teléfono"
-                value={nuevoCliente.telefono}
-                onChange={handleInputChange}
-                className="input-cliente"
-              />
-              <button type="submit" className="btn-registrar">Agregar</button>
-            </form>
-            <ul className="lista-clientes">
-              {clientes.map((c, idx) => (
-                <li key={idx}>
-                  <span>{c.nombre} {c.correo && `- ${c.correo}`} {c.telefono && `- ${c.telefono}`}</span>
-                  <button className="btn-eliminar" onClick={() => handleEliminarCliente(idx)}>Eliminar</button>
-                </li>
-              ))}
-              {clientes.length === 0 && <li>No hay clientes registrados.</li>}
-            </ul>
-          </div>
-        );
-      case 'historial':
-        return (
-          <div className="clientes-tab-content">
-            <h2>Clientes Frecuentes</h2>
-            <ul className="lista-clientes">
-              {clientesFrecuentes.map((c, idx) => (
-                <li key={idx}>
-                  <span>{c.nombre} - Área: {c.area}</span>
-                </li>
-              ))}
-            </ul>
-            <p style={{marginTop: 16, color: "#aaa"}}>Este historial se basa en los clientes con más pedidos en el área de producción.</p>
-          </div>
-        );
-      case 'comunicacion':
-        return (
-          <div className="clientes-tab-content">
-            <h2>Comunicación</h2>
-            <p>Opciones:</p>
-            <ul>
-              <li>Enviar notificación por correo a todos los clientes</li>
-              <li>Enviar mensaje personalizado</li>
-              <li>Ver historial de comunicaciones</li>
-            </ul>
-            <button className="btn-accion">Simular envío de notificación</button>
-          </div>
-        );
-      case 'fidelizacion':
-        return (
-          <div className="clientes-tab-content">
-            <h2>Fidelización</h2>
-            <p>Opciones de programas de recompensas:</p>
-            <ul>
-              <li>Descuentos por compras frecuentes</li>
-              <li>Acumulación de puntos por cada compra</li>
-              <li>Premios especiales a clientes leales</li>
-            </ul>
-            <button className="btn-accion">Simular activar programa</button>
-          </div>
-        );
-      default:
-        return null;
+  const loadClientes = async () => {
+    setLoading(true);
+    try {
+      const result = await window.electron.database.query('SELECT * FROM clientes ORDER BY nombre');
+      setClientes(result || []);
+    } catch (error) {
+      console.error('Error cargando clientes:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingCliente) {
+        // Actualizar
+        await window.electron.database.run(
+          `UPDATE clientes SET nombre = ?, telefono = ?, email = ?, direccion = ?, notas = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [formData.nombre, formData.telefono, formData.email, formData.direccion, formData.notas, editingCliente.id]
+        );
+      } else {
+        // Insertar
+        await window.electron.database.run(
+          `INSERT INTO clientes (nombre, telefono, email, direccion, notas) VALUES (?, ?, ?, ?, ?)`,
+          [formData.nombre, formData.telefono, formData.email, formData.direccion, formData.notas]
+        );
+      }
+      await loadClientes();
+      resetForm();
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error guardando cliente:', error);
+      alert('Error al guardar el cliente');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Eliminar este cliente? Se eliminará todo su historial.')) {
+      try {
+        await window.electron.database.run('DELETE FROM clientes WHERE id = ?', [id]);
+        await loadClientes();
+      } catch (error) {
+        console.error('Error eliminando cliente:', error);
+        alert('Error al eliminar el cliente');
+      }
+    }
+  };
+
+  const handleEdit = (cliente) => {
+    setEditingCliente(cliente);
+    setFormData({
+      nombre: cliente.nombre,
+      telefono: cliente.telefono || '',
+      email: cliente.email || '',
+      direccion: cliente.direccion || '',
+      notas: cliente.notas || ''
+    });
+    setShowModal(true);
+  };
+
+  const resetForm = () => {
+    setEditingCliente(null);
+    setFormData({
+      nombre: '',
+      telefono: '',
+      email: '',
+      direccion: '',
+      notas: ''
+    });
+  };
+
+  const filteredClientes = clientes.filter(cliente =>
+    cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cliente.telefono && cliente.telefono.includes(searchTerm))
+  );
+
+  if (loading) {
+    return <div className="loading">Cargando clientes...</div>;
+  }
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        minWidth: "100vw",
-        background: 'url("/asset/clientes-bg.jpg") center center/cover no-repeat',
-        padding: "40px"
-      }}
-    >
-      <div className="clientes-main-container">
-        <h1 className="clientes-title">Gestión de Clientes</h1>
-        {!activeTab && (
-          <div className="almacen-menu-botones">
-            <button className="flecha-css-btn" onClick={() => setActiveTab('registro')}>
-              Registro
-            </button>
-            <button className="flecha-css-btn" onClick={() => setActiveTab('historial')}>
-              Historial
-            </button>
-            <button className="flecha-css-btn" onClick={() => setActiveTab('comunicacion')}>
-              Comunicación
-            </button>
-            <button className="flecha-css-btn" onClick={() => setActiveTab('fidelizacion')}>
-              Fidelización
-            </button>
-          </div>
-        )}
-        {activeTab && (
-          <>
-            {renderTabContent()}
-            <button className="volver-btn" onClick={() => setActiveTab(null)}>
-              ← Volver al menú de Clientes
-            </button>
-          </>
-        )}
-        <button className="volver-dashboard-btn" onClick={onBackToDashboard}>
-          ← Volver al menú principal
-        </button>
+    <div className="clientes-container">
+      <div className="clientes-header">
+        <h1>Clientes</h1>
+        <div className="clientes-actions">
+          <input
+            type="text"
+            placeholder="🔍 Buscar por nombre o teléfono..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+          <button onClick={() => { resetForm(); setShowModal(true); }} className="btn-primary">
+            + Nuevo Cliente
+          </button>
+        </div>
       </div>
+
+      <div className="clientes-grid">
+        {filteredClientes.length === 0 ? (
+          <div className="empty-state">
+            <p>No hay clientes registrados</p>
+            <button onClick={() => { resetForm(); setShowModal(true); }}>Crear primer cliente</button>
+          </div>
+        ) : (
+          filteredClientes.map(cliente => (
+            <div key={cliente.id} className="cliente-card">
+              <div className="cliente-header">
+                <h3>{cliente.nombre}</h3>
+                <div className="cliente-actions">
+                  <button onClick={() => handleEdit(cliente)} className="edit-btn">✏️</button>
+                  <button onClick={() => handleDelete(cliente.id)} className="delete-btn">🗑️</button>
+                </div>
+              </div>
+              {cliente.telefono && <p>📞 {cliente.telefono}</p>}
+              {cliente.email && <p>✉️ {cliente.email}</p>}
+              {cliente.direccion && <p>📍 {cliente.direccion}</p>}
+              {cliente.notas && <p className="notas">📝 {cliente.notas.substring(0, 100)}</p>}
+              <p className="fecha">Cliente desde: {new Date(cliente.created_at).toLocaleDateString()}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => { setShowModal(false); resetForm(); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>{editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder="Nombre completo *"
+                value={formData.nombre}
+                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                required
+              />
+              <input
+                type="tel"
+                placeholder="Teléfono"
+                value={formData.telefono}
+                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+              <input
+                type="text"
+                placeholder="Dirección"
+                value={formData.direccion}
+                onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+              />
+              <textarea
+                placeholder="Notas adicionales"
+                value={formData.notas}
+                onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                rows="3"
+              />
+              <div className="modal-buttons">
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }}>Cancelar</button>
+                <button type="submit">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
