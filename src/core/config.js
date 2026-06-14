@@ -2,7 +2,7 @@ const path = require('path');
 const os = require('os');
 
 const userHome = os.homedir();
-const appName = 'CuboManager';
+const appName = 'MiTaller';
 const basePath = path.join(userHome, appName);
 
 const sqliteFiles = {

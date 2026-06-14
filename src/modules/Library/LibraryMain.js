@@ -99,7 +99,7 @@ const LibraryMain = ({ onBackToDashboard }) => {
           </p>
           <div className="library-storage-info">
             <p><strong>Archivo principal:</strong> inventario_laser.json</p>
-            <p><strong>Carpeta de datos:</strong> ~/.CuboManager/data/</p>
+            <p><strong>Carpeta de datos:</strong> ~/.MiTaller/data/</p>
           </div>
         </div>
       </div>

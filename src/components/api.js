@@ -2,7 +2,7 @@
 const hasIPC = typeof window !== 'undefined' && (window.electronAPI || window.api);
 
 const fallbackSettings = {
-  appName: 'CuboManager',
+  appName: 'MiTaller',
   primaryColor: '#3B82F6',
   secondaryColor: '#EFF6FF',
   language: 'es',

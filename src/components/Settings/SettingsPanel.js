@@ -18,7 +18,7 @@ const SettingsPanel = () => {
     >
       <div className="settings-header">
         <h2 className="settings-title">⚙️ Configuración del Sistema</h2>
-        <p className="settings-subtitle">Personaliza tu experiencia en Cubo Manager</p>
+        <p className="settings-subtitle">Personaliza tu experiencia en Mi Taller</p>
       </div>
 
       <div className="settings-content">

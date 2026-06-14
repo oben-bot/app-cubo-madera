@@ -1,94 +1,75 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, shell, screen } = require('electron');
 const path = require('path');
-const { registerIpcHandlers } = require('../src/core/ipcHandlers');
 
-const appId = 'com.cubomanager.desktop';
-app.setAppUserModelId(appId);
-
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow;
 
-function createMainWindow() {
+function createWindow() {
+  // Obtener tamaño de la pantalla
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  
+  // Tamaño inicial: 90% de la pantalla, máximo 1400x900
+  const windowWidth = Math.min(Math.floor(width * 0.9), 1400);
+  const windowHeight = Math.min(Math.floor(height * 0.9), 900);
+  
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 1280,
-    minHeight: 820,
-    maxWidth: 1280,
-    maxHeight: 820,
-    resizable: false,
-    fullscreenable: false,
-    show: false,
+    width: windowWidth,
+    height: windowHeight,
+    minWidth: 800,      // Tamaño mínimo para no romper diseño
+    minHeight: 600,
+    resizable: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
       nodeIntegration: false,
-      enableRemoteModule: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
+    titleBarStyle: 'hiddenInset',  // Barra de título más limpia
+    backgroundColor: '#0f0f1a',
+    show: false
   });
 
-  // Cargar el build de React
-  const indexPath = path.join(__dirname, '../build/index.html');
-  console.log('Cargando archivo:', indexPath);
-  mainWindow.loadFile(indexPath);
+  // Eliminar "Cubo Manager" de la barra de título
+  mainWindow.setTitle('');  // Vacío o lo que el usuario ponga en onboarding
+  
+  const startUrl = isDev
+    ? 'http://localhost:3000'
+    : `file://${path.join(__dirname, '../build/index.html')}`;
 
-  // Abrir DevTools para ver errores (comentar en producción)
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  mainWindow.loadURL(startUrl);
 
   mainWindow.once('ready-to-show', () => {
-    console.log('Ventana lista para mostrar');
     mainWindow.show();
+    // Centrar la ventana
+    mainWindow.center();
   });
 
-  mainWindow.webContents.on('crashed', () => {
-    console.error('❌ Renderer process crashed');
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
   });
 
-  return mainWindow;
-}
-
-function buildMenu() {
-  const template = [
-    {
-      label: 'Archivo',
-      submenu: [
-        { role: 'quit', label: 'Salir' },
-      ],
-    },
-    {
-      label: 'Ver',
-      submenu: [
-        { role: 'reload', label: 'Recargar' },
-        { role: 'toggledevtools', label: 'Alternar DevTools' },
-      ],
-    },
-    {
-      label: 'Ventana',
-      submenu: [
-        { role: 'minimize', label: 'Minimizar' },
-        { role: 'close', label: 'Cerrar' },
-      ],
-    },
-  ];
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
-}
-
-// Inicializar aplicación
-app.whenReady().then(() => {
-  console.log('✅ Electron app ready');
-  buildMenu();
-  createMainWindow();
-  registerIpcHandlers(ipcMain, mainWindow);
-});
-
-// Activar cuando se hace clic en el dock (macOS)
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow();
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
   }
+  
+  // Manejar cambio de título dinámico
+  mainWindow.webContents.on('page-title-updated', (event, title) => {
+    event.preventDefault();
+    // Usar el nombre del negocio en lugar del título por defecto
+    if (title !== 'Mi Taller') {
+      mainWindow.setTitle('');
+    }
+  });
+}
+
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
 });
 
-// Cerrar la aplicación cuando se cierren todas las ventanas
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

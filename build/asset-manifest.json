@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "./static/css/main.f4b7d80f.css",
+    "main.js": "./static/js/main.7bbbc695.js",
+    "static/media/finanzas-bg.jpg": "./static/media/finanzas-bg.bc20dfddb54ed46152e1.jpg",
+    "static/media/trabajo-bg.jpg": "./static/media/trabajo-bg.ac5f46bc07fd0d9e0ef3.jpg",
+    "static/media/trash-icon.svg": "./static/media/trash-icon.847f5fd17a3afa6c0e0796876e45686a.svg",
+    "index.html": "./index.html",
+    "main.f4b7d80f.css.map": "./static/css/main.f4b7d80f.css.map",
+    "main.7bbbc695.js.map": "./static/js/main.7bbbc695.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f4b7d80f.css",
+    "static/js/main.7bbbc695.js"
+  ]
+}

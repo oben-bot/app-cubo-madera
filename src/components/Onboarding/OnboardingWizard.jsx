@@ -1,42 +1,75 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './OnboardingWizard.css';
 
 const OnboardingWizard = ({ onComplete }) => {
   const [step, setStep] = useState(1);
-  const [config, setConfig] = useState({
-    language: 'es',
-    theme: 'system',
-    moneda: 'MXN',
-    modules: {
-      dashboard: true,
-      customers: true,
-      quotations: true,
-      production: true,
-      warehouse: true,
-      sales: true,
-      finance: true,
-      calendar: true
-    }
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    businessName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    theme: 'dark',
+    language: 'es'
   });
 
-  const totalSteps = 5;
+  const totalSteps = 4;
+
+  const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
   const handleNext = async () => {
+    setError('');
+    
+    // Paso 1: Nombre del negocio
+    if (step === 1 && !formData.businessName.trim()) {
+      setError('Ingresa el nombre de tu negocio');
+      return;
+    }
+    
+    // Paso 2: Correo electrónico
+    if (step === 2) {
+      if (!formData.email.trim()) {
+        setError('Ingresa tu correo electrónico');
+        return;
+      }
+      if (!validateEmail(formData.email)) {
+        setError('Ingresa un correo electrónico válido');
+        return;
+      }
+    }
+    
+    // Paso 3: Contraseña
+    if (step === 3) {
+      if (!formData.password) {
+        setError('Ingresa una contraseña');
+        return;
+      }
+      if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+    }
+    
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
-      // Guardar configuraciones
-      await window.electron.config.set('language', config.language);
-      await window.electron.config.set('theme', config.theme);
-      await window.electron.config.set('moneda', config.moneda);
-      
-      for (const [module, active] of Object.entries(config.modules)) {
-        await window.electron.config.set(`modulo_${module}_activo`, active);
-      }
-      
-      // Marcar onboarding como completado
+      // Guardar configuración final
+      setLoading(true);
+      await window.electron.config.set('business_name', formData.businessName);
+      await window.electron.config.set('user_email', formData.email);
+      await window.electron.config.set('password', formData.password);
+      await window.electron.config.set('theme', formData.theme);
+      await window.electron.config.set('language', formData.language);
       await window.electron.config.set('onboarding_completed', true);
       
+      setLoading(false);
       onComplete();
     }
   };
@@ -50,107 +83,108 @@ const OnboardingWizard = ({ onComplete }) => {
       <div className="onboarding-wizard">
         <div className="onboarding-progress">
           <div className="progress-bar" style={{ width: `${(step / totalSteps) * 100}%` }}></div>
-          <span>Paso {step} de {totalSteps}</span>
+          <span>Configuración inicial - Paso {step} de {totalSteps}</span>
         </div>
 
-        {/* Paso 1: Bienvenida */}
+        {/* Paso 1: Nombre del negocio */}
         {step === 1 && (
           <div className="onboarding-step">
-            <h1>🎉 Bienvenido a Cubo Manager</h1>
-            <p>El sistema de gestión completo para tu taller de corte láser.</p>
-            <p>Este asistente te guiará en la configuración inicial.</p>
+            <div className="step-icon">🏪</div>
+            <h2>¿Cómo se llama tu negocio?</h2>
+            <p>Este nombre aparecerá en la app y en los documentos</p>
+            <div className="form-group">
+              <input 
+                type="text" 
+                placeholder="Ej: Taller Laser Express" 
+                value={formData.businessName}
+                onChange={(e) => setFormData({...formData, businessName: e.target.value})}
+                autoFocus
+              />
+            </div>
           </div>
         )}
 
-        {/* Paso 2: Idioma y Tema */}
+        {/* Paso 2: Correo electrónico */}
         {step === 2 && (
           <div className="onboarding-step">
-            <h2>🌐 Configuración básica</h2>
+            <div className="step-icon">📧</div>
+            <h2>Tu correo electrónico</h2>
+            <p>Lo usarás para recuperar tu contraseña</p>
             <div className="form-group">
-              <label>Idioma</label>
-              <select value={config.language} onChange={(e) => setConfig({ ...config, language: e.target.value })}>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-              </select>
+              <input 
+                type="email" 
+                placeholder="tu@email.com" 
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
             </div>
+          </div>
+        )}
+
+        {/* Paso 3: Contraseña */}
+        {step === 3 && (
+          <div className="onboarding-step">
+            <div className="step-icon">🔒</div>
+            <h2>Crea una contraseña segura</h2>
+            <p>Mínimo 6 caracteres</p>
+            <div className="form-group">
+              <input 
+                type="password" 
+                placeholder="Contraseña" 
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+              />
+              <input 
+                type="password" 
+                placeholder="Confirmar contraseña" 
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                style={{ marginTop: '10px' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Paso 4: Personalización */}
+        {step === 4 && (
+          <div className="onboarding-step">
+            <div className="step-icon">🎨</div>
+            <h2>Personaliza tu experiencia</h2>
             <div className="form-group">
               <label>Tema</label>
-              <div className="theme-buttons">
-                <button className={config.theme === 'light' ? 'selected' : ''} onClick={() => setConfig({ ...config, theme: 'light' })}>
-                  ☀️ Claro
-                </button>
-                <button className={config.theme === 'dark' ? 'selected' : ''} onClick={() => setConfig({ ...config, theme: 'dark' })}>
-                  🌙 Oscuro
-                </button>
-                <button className={config.theme === 'system' ? 'selected' : ''} onClick={() => setConfig({ ...config, theme: 'system' })}>
-                  💻 Sistema
-                </button>
+              <div className="theme-options">
+                <button 
+                  className={formData.theme === 'dark' ? 'selected' : ''}
+                  onClick={() => setFormData({...formData, theme: 'dark'})}
+                >🌙 Oscuro</button>
+                <button 
+                  className={formData.theme === 'light' ? 'selected' : ''}
+                  onClick={() => setFormData({...formData, theme: 'light'})}
+                >☀️ Claro</button>
               </div>
             </div>
             <div className="form-group">
-              <label>Moneda</label>
-              <select value={config.moneda} onChange={(e) => setConfig({ ...config, moneda: e.target.value })}>
-                <option value="MXN">Peso Mexicano (MXN)</option>
-                <option value="USD">Dólar (USD)</option>
-                <option value="EUR">Euro (EUR)</option>
-              </select>
+              <label>Idioma</label>
+              <div className="theme-options">
+                <button 
+                  className={formData.language === 'es' ? 'selected' : ''}
+                  onClick={() => setFormData({...formData, language: 'es'})}
+                >🇪🇸 Español</button>
+                <button 
+                  className={formData.language === 'en' ? 'selected' : ''}
+                  onClick={() => setFormData({...formData, language: 'en'})}
+                >🇬🇧 English</button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Paso 3: Módulos */}
-        {step === 3 && (
-          <div className="onboarding-step">
-            <h2>📦 Selecciona los módulos que usarás</h2>
-            <div className="modules-grid-onboarding">
-              <label><input type="checkbox" checked={config.modules.customers} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, customers: e.target.checked } })} /> Clientes</label>
-              <label><input type="checkbox" checked={config.modules.quotations} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, quotations: e.target.checked } })} /> Cotizaciones</label>
-              <label><input type="checkbox" checked={config.modules.production} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, production: e.target.checked } })} /> Producción</label>
-              <label><input type="checkbox" checked={config.modules.warehouse} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, warehouse: e.target.checked } })} /> Almacén</label>
-              <label><input type="checkbox" checked={config.modules.sales} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, sales: e.target.checked } })} /> Ventas</label>
-              <label><input type="checkbox" checked={config.modules.finance} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, finance: e.target.checked } })} /> Finanzas</label>
-              <label><input type="checkbox" checked={config.modules.calendar} onChange={(e) => setConfig({ ...config, modules: { ...config.modules, calendar: e.target.checked } })} /> Calendario</label>
-            </div>
-          </div>
-        )}
-
-        {/* Paso 4: Contraseña */}
-        {step === 4 && (
-          <div className="onboarding-step">
-            <h2>🔒 Configura tu contraseña de administrador</h2>
-            <div className="form-group">
-              <label>Contraseña</label>
-              <input type="password" placeholder="Mínimo 6 caracteres" id="adminPassword" />
-            </div>
-            <div className="form-group">
-              <label>Confirmar contraseña</label>
-              <input type="password" placeholder="Repite la contraseña" id="confirmPassword" />
-            </div>
-            <p className="info">Usarás esta contraseña para iniciar sesión.</p>
-          </div>
-        )}
-
-        {/* Paso 5: Final */}
-        {step === 5 && (
-          <div className="onboarding-step">
-            <h2>✅ ¡Todo listo!</h2>
-            <p>Tu app está configurada y lista para usar.</p>
-            <p>Puedes cambiar cualquier ajuste en Configuración más tarde.</p>
-            <div className="tips">
-              <h3>💡 Tips rápidos:</h3>
-              <ul>
-                <li>Usa Ctrl+N para crear una nueva cotización</li>
-                <li>Arrastra archivos a la Biblioteca para agregar diseños</li>
-                <li>Los respaldos se hacen automáticamente cada día</li>
-              </ul>
-            </div>
-          </div>
-        )}
+        {error && <div className="error-msg">{error}</div>}
 
         <div className="onboarding-buttons">
           {step > 1 && <button onClick={handlePrev} className="btn-secondary">Anterior</button>}
-          <button onClick={handleNext} className="btn-primary">
-            {step === totalSteps ? 'Comenzar' : 'Siguiente'}
+          <button onClick={handleNext} className="btn-primary" disabled={loading}>
+            {loading ? 'Guardando...' : (step === totalSteps ? 'Comenzar' : 'Siguiente')}
           </button>
         </div>
       </div>

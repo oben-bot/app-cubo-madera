@@ -20,7 +20,7 @@ const LayoutSidebar = ({ onLogout }) => {
   return (
     <div className="sidebar-container">
       <div className="sidebar-header">
-        <h2>Cubo Manager</h2>
+        <h2>Mi Taller</h2>
       </div>
       <nav className="sidebar-nav">
         <ul>

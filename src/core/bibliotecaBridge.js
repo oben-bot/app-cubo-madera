@@ -169,7 +169,7 @@ class BibliotecaBridge {
     };
   }
 
-  // Sincronizar productos desde Cubo Manager a Biblioteca
+  // Sincronizar productos desde Mi Taller a Biblioteca
   async syncProductosToBiblioteca() {
     const { query } = require('./database');
     const productos = query(`SELECT * FROM inventario WHERE tipo = 'producto_terminado' AND cantidad > 0`);

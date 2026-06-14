@@ -143,3 +143,68 @@
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* Asegurar que los inputs sean visibles */
+.onboarding-step .form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  background: var(--input-bg, #1e1e2e);
+  border: 1px solid var(--border-color, #3a3a4e);
+  border-radius: 8px;
+  color: var(--text-color, #ffffff);
+  display: block;
+}
+
+.onboarding-step .form-group input:focus {
+  outline: none;
+  border-color: var(--primary-color, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+}
+
+.onboarding-step .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-color, #e0e0e0);
+}
+
+/* Asegurar visibilidad en modo claro */
+[data-theme="light"] .onboarding-step .form-group input {
+  background: #ffffff;
+  border-color: #cccccc;
+  color: #1a1a1a;
+}
+
+/* Estilos específicos para inputs del onboarding */
+.onboarding-step .form-group {
+  margin: 20px 0;
+}
+
+.onboarding-step .form-group input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  background: #1e1e2e !important;
+  border: 1px solid #3a3a4e !important;
+  border-radius: 10px !important;
+  color: #ffffff !important;
+  display: block !important;
+  box-sizing: border-box !important;
+}
+
+.onboarding-step .form-group input::placeholder {
+  color: #888888;
+}
+
+.onboarding-step .form-group input:focus {
+  border-color: #3b82f6 !important;
+  outline: none;
+}
+
+/* Modo claro */
+.light .onboarding-step .form-group input {
+  background: #ffffff !important;
+  border-color: #cccccc !important;
+  color: #1a1a1a !important;
+}
