@@ -27,4 +27,15 @@ module.exports = {
   inventoryFile: path.join(basePath, 'data', 'inventario_laser.json'),
   settingsFile: path.join(basePath, 'data', 'settings.json'),
   sqliteFiles,
+  // Mini-Apps externas (lanzadas como proceso separado, no embebidas).
+  // Se agrega una entrada por cada Mini-App; el mismo patrón sirve para
+  // futuras herramientas (Producción, Marketing, etc.).
+  miniApps: {
+    biblioteca: {
+      // Ruta real de la Mini-App en la máquina del taller.
+      // TODO: mover a settings.json / onboarding para no hardcodear
+      // rutas de un usuario específico.
+      windowsPath: 'C:\\Users\\HP\\Documents\\Logica_Biblioteca_Laser\\organizador_laser.pyw',
+    },
+  },
 };

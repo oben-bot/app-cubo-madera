@@ -218,4 +218,17 @@ function allQuery(sql, params = []) {
   });
 }
 
-module.exports = { getDatabase, runQuery, getQuery, allQuery };
+module.exports = {
+  getDatabase,
+  runQuery,
+  getQuery,
+  allQuery,
+  // Alias de compatibilidad: ipcHandlers.js fue escrito contra una versión
+  // anterior de este módulo que usaba estos nombres. Se mantienen ambos
+  // para no tener que reescribir todos los handlers.
+  getDb: getDatabase,
+  run: runQuery,
+  get: getQuery,
+  query: allQuery,
+  initializeDatabase: getDatabase, // getDatabase() ya crea las tablas si no existen
+};

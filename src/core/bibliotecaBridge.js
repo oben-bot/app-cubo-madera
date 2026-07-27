@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const config = require('./config');
 
 class BibliotecaBridge {
   constructor() {
@@ -14,13 +15,19 @@ class BibliotecaBridge {
 
   // Buscar la app de Biblioteca Laser en el sistema
   async findBiblioteca() {
-    // Posibles rutas donde podría estar instalada
+    // Ruta configurada centralmente (ver src/core/config.js -> miniApps.biblioteca)
+    const configuredPath = config.miniApps?.biblioteca?.windowsPath;
+    if (configuredPath && fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
+
+    // Rutas alternativas por si se ejecuta en otro sistema/instalación
     const possiblePaths = [
       path.join(process.cwd(), '..', 'BibliotecaLaser'),
       '/home/ubuntu/BibliotecaLaser',
       'C:/BibliotecaLaser'
     ];
-    
+
     for (const basePath of possiblePaths) {
       const exePath = path.join(basePath, 'BibliotecaLaser.exe');
       const pywPath = path.join(basePath, 'biblioteca.pyw');
@@ -46,7 +53,11 @@ class BibliotecaBridge {
       if (bibPath.endsWith('.exe')) {
         this.bibliotecaProcess = spawn(bibPath, [], { detached: true, stdio: 'ignore' });
         this.bibliotecaProcess.unref();
-      } else if (bibPath.endsWith('.pyw') || bibPath.endsWith('.py')) {
+      } else if (bibPath.endsWith('.pyw')) {
+        // pythonw evita que se abra una ventana de consola junto a la Mini-App
+        this.bibliotecaProcess = spawn('pythonw', [bibPath], { detached: true, stdio: 'ignore' });
+        this.bibliotecaProcess.unref();
+      } else if (bibPath.endsWith('.py')) {
         this.bibliotecaProcess = spawn('python3', [bibPath], { detached: true, stdio: 'ignore' });
         this.bibliotecaProcess.unref();
       }

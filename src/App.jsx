@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './components/Auth/LoginScreen';
 import OnboardingWizard from './components/Onboarding/OnboardingWizard';
 import DashboardMenu from './modules/Dashboard/DashboardMain';
@@ -48,26 +48,24 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="app-layout">
-        <LayoutSidebar onLogout={() => setIsAuth(false)} />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-            <Route path="/dashboard" element={<DashboardMenu />} />
-            <Route path="/warehouse" element={<Warehouse />} />
-            <Route path="/customers" element={<ClientesMain />} />
-            <Route path="/finance" element={<FinanzasMain />} />
-            <Route path="/production" element={<ProductionMain />} />
-            <Route path="/quotations" element={<CotizacionesMain />} />
-            <Route path="/sales" element={<VentasMain />} />
-            <Route path="/library" element={<LibraryMain />} />
-            <Route path="/settings" element={<SettingsMain />} />
-            <Route path="/assistant" element={<Assistant />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <div className="app-layout">
+      <LayoutSidebar onLogout={() => setIsAuth(false)} />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={<DashboardMenu />} />
+          <Route path="/warehouse" element={<Warehouse />} />
+          <Route path="/customers" element={<ClientesMain />} />
+          <Route path="/finance" element={<FinanzasMain />} />
+          <Route path="/production" element={<ProductionMain />} />
+          <Route path="/quotations" element={<CotizacionesMain />} />
+          <Route path="/sales" element={<VentasMain />} />
+          <Route path="/library" element={<LibraryMain />} />
+          <Route path="/settings" element={<SettingsMain />} />
+          <Route path="/assistant" element={<Assistant />} />
+        </Routes>
+      </main>
+    </div>
   );
 }
 

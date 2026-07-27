@@ -100,8 +100,25 @@ export const ThemeProvider = ({ children }) => {
   };
 
   // Aplicar estilos CSS del tema
+  // IMPORTANTE: estos son los nombres de variable que usan de verdad
+  // los módulos (Dashboard, Warehouse, Settings, etc.). Antes esta función
+  // escribía --theme-*, que no coincidía con nada y dejaba todo sin estilo.
   const applyThemeStyles = (theme) => {
     const root = document.documentElement;
+    root.style.setProperty('--bg-dark', theme.background);
+    root.style.setProperty('--card-bg', theme.surface);
+    root.style.setProperty('--border-color', 'rgba(148, 163, 184, 0.15)');
+    root.style.setProperty('--button-bg', theme.surface);
+    root.style.setProperty('--primary-color', theme.primary);
+    root.style.setProperty('--main-color', theme.primary);
+    root.style.setProperty('--hover-bg', `${theme.primary}1f`); // ~12% opacidad
+    root.style.setProperty('--header-bg', theme.background);
+    root.style.setProperty('--input-bg', theme.background);
+    root.style.setProperty('--text-color', theme.text);
+    root.style.setProperty('--text-muted', theme.text + '99'); // ~60% opacidad
+
+    // Se mantienen también por compatibilidad, por si algún componente
+    // futuro los usa directamente.
     root.style.setProperty('--theme-primary', theme.primary);
     root.style.setProperty('--theme-secondary', theme.secondary);
     root.style.setProperty('--theme-background', theme.background);

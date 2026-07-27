@@ -1,5 +1,6 @@
-const { app, BrowserWindow, shell, screen } = require('electron');
+const { app, BrowserWindow, shell, screen, ipcMain } = require('electron');
 const path = require('path');
+const { registerIpcHandlers } = require('../src/core/ipcHandlers');
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow;
@@ -63,6 +64,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerIpcHandlers(ipcMain);
   createWindow();
 
   app.on('activate', () => {

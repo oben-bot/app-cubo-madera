@@ -90,6 +90,15 @@ contextBridge.exposeInMainWorld('electron', {
     syncGumroad: () => ipcRenderer.invoke('marketing:syncGumroad'),
     getExportaciones: (limit) => ipcRenderer.invoke('marketing:getExportaciones', limit)
   },
+  // Biblioteca Laser (Mini-App externa)
+  biblioteca: {
+    getStatus: () => ipcRenderer.invoke('biblioteca:getStatus'),
+    start: () => ipcRenderer.invoke('biblioteca:start'),
+    getDisenos: (categoria) => ipcRenderer.invoke('biblioteca:getDisenos', categoria),
+    getDisenoById: (id) => ipcRenderer.invoke('biblioteca:getDisenoById', id),
+    copiarDiseno: (disenoId, trabajoId) => ipcRenderer.invoke('biblioteca:copiarDiseno', disenoId, trabajoId),
+    syncProductos: () => ipcRenderer.invoke('biblioteca:syncProductos')
+  },
   // Ventana
   window: {
     close: () => ipcRenderer.send('window:close'),
