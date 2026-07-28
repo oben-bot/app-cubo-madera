@@ -2,7 +2,7 @@ const { app, BrowserWindow, shell, screen, ipcMain } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('../src/core/ipcHandlers');
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = process.env.NODE_ENV === 'development';
 let mainWindow;
 
 function createWindow() {
