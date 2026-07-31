@@ -182,6 +182,71 @@ function getDatabase() {
       completado BOOLEAN DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    // ==================== COSTEO (estilo LaserCalc Pro) ====================
+    // Config de máquina: una sola fila, se actualiza (no se inserta de nuevo)
+    db.run(`CREATE TABLE IF NOT EXISTS configuracion_maquina (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      costo_adquisicion REAL DEFAULT 0,
+      amortizacion_meses INTEGER DEFAULT 24,
+      costo_laser REAL DEFAULT 0,
+      vida_util_laser_horas REAL DEFAULT 0,
+      costo_opticas REAL DEFAULT 0,
+      vida_util_opticas_horas REAL DEFAULT 0,
+      costo_filtros REAL DEFAULT 0,
+      vida_util_filtros_horas REAL DEFAULT 0,
+      tarifa_supervision_hora REAL DEFAULT 0,
+      tarifa_mano_obra_hora REAL DEFAULT 0,
+      watts_maquina REAL DEFAULT 0,
+      costo_kwh REAL DEFAULT 0,
+      moneda TEXT DEFAULT '$',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Catálogo de láminas/planchas de material
+    db.run(`CREATE TABLE IF NOT EXISTS catalogo_materiales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      tipo TEXT,
+      precio_plancha REAL NOT NULL,
+      ancho_cm REAL NOT NULL,
+      alto_cm REAL NOT NULL,
+      activo BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Catálogo de insumos/extras (unitarios)
+    db.run(`CREATE TABLE IF NOT EXISTS catalogo_insumos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      costo_unitario REAL NOT NULL,
+      unidad TEXT DEFAULT 'pieza',
+      activo BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Consumo de materiales/insumos por trabajo o cotización (el "BOM" real)
+    db.run(`CREATE TABLE IF NOT EXISTS trabajo_materiales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      referencia_tipo TEXT NOT NULL,
+      referencia_id INTEGER NOT NULL,
+      material_id INTEGER REFERENCES catalogo_materiales(id),
+      insumo_id INTEGER REFERENCES catalogo_insumos(id),
+      area_cm2 REAL,
+      cantidad REAL DEFAULT 1,
+      costo_calculado REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tiempos de máquina y mano de obra por trabajo o cotización
+    db.run(`CREATE TABLE IF NOT EXISTS trabajo_tiempos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      referencia_tipo TEXT NOT NULL,
+      referencia_id INTEGER NOT NULL,
+      minutos_laser REAL DEFAULT 0,
+      minutos_mano_obra REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
   });
   
   return db;

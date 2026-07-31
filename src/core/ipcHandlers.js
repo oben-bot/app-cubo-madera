@@ -772,6 +772,156 @@ function registerIpcHandlers(ipcMain, mainWindow) {
       }
     }
   });
+
+  // ==================== COSTEO (estilo LaserCalc Pro) ====================
+
+  ipcMain.handle('costeo:getConfigMaquina', async () => {
+    const cfg = await get('SELECT * FROM configuracion_maquina WHERE id = 1');
+    return cfg || null;
+  });
+
+  ipcMain.handle('costeo:saveConfigMaquina', async (_, cfg) => {
+    await run(`INSERT INTO configuracion_maquina
+        (id, costo_adquisicion, amortizacion_meses, costo_laser, vida_util_laser_horas,
+         costo_opticas, vida_util_opticas_horas, costo_filtros, vida_util_filtros_horas,
+         tarifa_supervision_hora, tarifa_mano_obra_hora, watts_maquina, costo_kwh, moneda, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        costo_adquisicion=excluded.costo_adquisicion,
+        amortizacion_meses=excluded.amortizacion_meses,
+        costo_laser=excluded.costo_laser,
+        vida_util_laser_horas=excluded.vida_util_laser_horas,
+        costo_opticas=excluded.costo_opticas,
+        vida_util_opticas_horas=excluded.vida_util_opticas_horas,
+        costo_filtros=excluded.costo_filtros,
+        vida_util_filtros_horas=excluded.vida_util_filtros_horas,
+        tarifa_supervision_hora=excluded.tarifa_supervision_hora,
+        tarifa_mano_obra_hora=excluded.tarifa_mano_obra_hora,
+        watts_maquina=excluded.watts_maquina,
+        costo_kwh=excluded.costo_kwh,
+        moneda=excluded.moneda,
+        updated_at=CURRENT_TIMESTAMP`,
+      [cfg.costo_adquisicion, cfg.amortizacion_meses, cfg.costo_laser, cfg.vida_util_laser_horas,
+       cfg.costo_opticas, cfg.vida_util_opticas_horas, cfg.costo_filtros, cfg.vida_util_filtros_horas,
+       cfg.tarifa_supervision_hora, cfg.tarifa_mano_obra_hora, cfg.watts_maquina, cfg.costo_kwh, cfg.moneda || '$']);
+    return { success: true };
+  });
+
+  ipcMain.handle('costeo:getMateriales', async () => {
+    return await query('SELECT * FROM catalogo_materiales WHERE activo = 1 ORDER BY nombre');
+  });
+
+  ipcMain.handle('costeo:saveMaterial', async (_, m) => {
+    if (m.id) {
+      await run(`UPDATE catalogo_materiales SET nombre=?, tipo=?, precio_plancha=?, ancho_cm=?, alto_cm=? WHERE id=?`,
+        [m.nombre, m.tipo, m.precio_plancha, m.ancho_cm, m.alto_cm, m.id]);
+      return { success: true, id: m.id };
+    }
+    const result = await run(`INSERT INTO catalogo_materiales (nombre, tipo, precio_plancha, ancho_cm, alto_cm) VALUES (?, ?, ?, ?, ?)`,
+      [m.nombre, m.tipo, m.precio_plancha, m.ancho_cm, m.alto_cm]);
+    return { success: true, id: result.lastID };
+  });
+
+  ipcMain.handle('costeo:deleteMaterial', async (_, id) => {
+    await run('UPDATE catalogo_materiales SET activo = 0 WHERE id = ?', [id]);
+    return { success: true };
+  });
+
+  ipcMain.handle('costeo:getInsumos', async () => {
+    return await query('SELECT * FROM catalogo_insumos WHERE activo = 1 ORDER BY nombre');
+  });
+
+  ipcMain.handle('costeo:saveInsumo', async (_, s) => {
+    if (s.id) {
+      await run(`UPDATE catalogo_insumos SET nombre=?, costo_unitario=?, unidad=? WHERE id=?`,
+        [s.nombre, s.costo_unitario, s.unidad, s.id]);
+      return { success: true, id: s.id };
+    }
+    const result = await run(`INSERT INTO catalogo_insumos (nombre, costo_unitario, unidad) VALUES (?, ?, ?)`,
+      [s.nombre, s.costo_unitario, s.unidad || 'pieza']);
+    return { success: true, id: result.lastID };
+  });
+
+  ipcMain.handle('costeo:deleteInsumo', async (_, id) => {
+    await run('UPDATE catalogo_insumos SET activo = 0 WHERE id = ?', [id]);
+    return { success: true };
+  });
+
+  // Registrar consumo de material/insumo para un trabajo o cotización específico
+  ipcMain.handle('costeo:addConsumo', async (_, item) => {
+    let costoCalculado = 0;
+    if (item.material_id && item.area_cm2) {
+      const mat = await get('SELECT * FROM catalogo_materiales WHERE id = ?', [item.material_id]);
+      if (mat) {
+        const costoPorCm2 = mat.precio_plancha / (mat.ancho_cm * mat.alto_cm);
+        costoCalculado = costoPorCm2 * item.area_cm2;
+      }
+    } else if (item.insumo_id) {
+      const ins = await get('SELECT * FROM catalogo_insumos WHERE id = ?', [item.insumo_id]);
+      if (ins) costoCalculado = ins.costo_unitario * (item.cantidad || 1);
+    }
+    const result = await run(`INSERT INTO trabajo_materiales
+        (referencia_tipo, referencia_id, material_id, insumo_id, area_cm2, cantidad, costo_calculado)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [item.referencia_tipo, item.referencia_id, item.material_id || null, item.insumo_id || null,
+       item.area_cm2 || null, item.cantidad || 1, costoCalculado]);
+    return { success: true, id: result.lastID, costo_calculado: costoCalculado };
+  });
+
+  ipcMain.handle('costeo:getConsumo', async (_, referenciaTipo, referenciaId) => {
+    return await query('SELECT * FROM trabajo_materiales WHERE referencia_tipo = ? AND referencia_id = ?',
+      [referenciaTipo, referenciaId]);
+  });
+
+  ipcMain.handle('costeo:saveTiempos', async (_, referenciaTipo, referenciaId, minutosLaser, minutosManoObra) => {
+    await run(`INSERT INTO trabajo_tiempos (referencia_tipo, referencia_id, minutos_laser, minutos_mano_obra)
+      VALUES (?, ?, ?, ?)`, [referenciaTipo, referenciaId, minutosLaser || 0, minutosManoObra || 0]);
+    return { success: true };
+  });
+
+  // Cálculo de costo completo: material + desgaste de máquina + electricidad + mano de obra
+  // (misma lógica que LaserCalc Pro, adaptada a nuestro esquema)
+  ipcMain.handle('costeo:calcularCosto', async (_, referenciaTipo, referenciaId) => {
+    const cfg = (await get('SELECT * FROM configuracion_maquina WHERE id = 1')) || {};
+    const materiales = await query('SELECT * FROM trabajo_materiales WHERE referencia_tipo = ? AND referencia_id = ?',
+      [referenciaTipo, referenciaId]);
+    const tiempos = await query('SELECT * FROM trabajo_tiempos WHERE referencia_tipo = ? AND referencia_id = ?',
+      [referenciaTipo, referenciaId]);
+
+    const costoMaterial = materiales.reduce((sum, m) => sum + (m.costo_calculado || 0), 0);
+    const minutosLaser = tiempos.reduce((sum, t) => sum + (t.minutos_laser || 0), 0);
+    const minutosManoObra = tiempos.reduce((sum, t) => sum + (t.minutos_mano_obra || 0), 0);
+
+    // Costo técnico por minuto: amortización de la máquina + desgaste de componentes
+    const amortizacionPorMinuto = cfg.amortizacion_meses
+      ? (cfg.costo_adquisicion || 0) / (cfg.amortizacion_meses * 30 * 24 * 60)
+      : 0;
+    const desgasteLaserPorMinuto = cfg.vida_util_laser_horas
+      ? (cfg.costo_laser || 0) / (cfg.vida_util_laser_horas * 60) : 0;
+    const desgasteOpticasPorMinuto = cfg.vida_util_opticas_horas
+      ? (cfg.costo_opticas || 0) / (cfg.vida_util_opticas_horas * 60) : 0;
+    const desgasteFiltrosPorMinuto = cfg.vida_util_filtros_horas
+      ? (cfg.costo_filtros || 0) / (cfg.vida_util_filtros_horas * 60) : 0;
+    const costoTecnicoPorMinuto = amortizacionPorMinuto + desgasteLaserPorMinuto
+      + desgasteOpticasPorMinuto + desgasteFiltrosPorMinuto;
+
+    const costoDesgaste = costoTecnicoPorMinuto * minutosLaser;
+    const costoElectricidad = ((cfg.watts_maquina || 0) / 1000) * (cfg.costo_kwh || 0) * (minutosLaser / 60);
+    const costoSupervision = (cfg.tarifa_supervision_hora || 0) * (minutosLaser / 60);
+    const costoManoObra = (cfg.tarifa_mano_obra_hora || 0) * (minutosManoObra / 60);
+
+    const costoTotal = costoMaterial + costoDesgaste + costoElectricidad + costoSupervision + costoManoObra;
+
+    return {
+      costo_material: Math.round(costoMaterial * 100) / 100,
+      costo_desgaste_maquina: Math.round(costoDesgaste * 100) / 100,
+      costo_electricidad: Math.round(costoElectricidad * 100) / 100,
+      costo_supervision: Math.round(costoSupervision * 100) / 100,
+      costo_mano_obra: Math.round(costoManoObra * 100) / 100,
+      costo_total: Math.round(costoTotal * 100) / 100,
+      moneda: cfg.moneda || '$',
+    };
+  });
 }
 
 module.exports = {
