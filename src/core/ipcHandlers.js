@@ -60,12 +60,12 @@ function registerIpcHandlers(ipcMain, mainWindow) {
 
   // Configuración
   ipcMain.handle('config:get', async (_, key) => {
-    const result = get('SELECT valor FROM configuraciones WHERE clave = ?', [key]);
+    const result = await get('SELECT valor FROM configuraciones WHERE clave = ?', [key]);
     return result ? result.valor : null;
   });
 
   ipcMain.handle('config:set', async (_, key, value) => {
-    return run(
+    return await run(
       'INSERT OR REPLACE INTO configuraciones (clave, valor, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
       [key, value]
     );
@@ -74,24 +74,24 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   // ==================== INVENTARIO HANDLERS ====================
   
   ipcMain.handle('inventario:getAll', async () => {
-    return query('SELECT * FROM inventario ORDER BY nombre');
+    return await query('SELECT * FROM inventario ORDER BY nombre');
   });
 
   ipcMain.handle('inventario:getById', async (_, id) => {
-    return get('SELECT * FROM inventario WHERE id = ?', [id]);
+    return await get('SELECT * FROM inventario WHERE id = ?', [id]);
   });
 
   ipcMain.handle('inventario:create', async (_, producto) => {
     const sql = `INSERT INTO inventario 
       (codigo, nombre, categoria, tipo, cantidad, unidad, stock_minimo, ubicacion, proveedor, precio_compra, precio_venta, notas) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const result = run(sql, [
+    const result = await run(sql, [
       producto.codigo, producto.nombre, producto.categoria, producto.tipo,
       producto.cantidad || 0, producto.unidad || 'unidad', producto.stock_minimo || 0,
       producto.ubicacion, producto.proveedor, producto.precio_compra || 0,
       producto.precio_venta || 0, producto.notas
     ]);
-    return { id: result.lastInsertRowid, ...producto };
+    return { id: result.lastID, ...producto };
   });
 
   ipcMain.handle('inventario:update', async (_, id, producto) => {
@@ -99,7 +99,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
       codigo = ?, nombre = ?, categoria = ?, tipo = ?, cantidad = ?, unidad = ?,
       stock_minimo = ?, ubicacion = ?, proveedor = ?, precio_compra = ?, precio_venta = ?, 
       notas = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-    run(sql, [
+    await run(sql, [
       producto.codigo, producto.nombre, producto.categoria, producto.tipo,
       producto.cantidad, producto.unidad, producto.stock_minimo,
       producto.ubicacion, producto.proveedor, producto.precio_compra,
@@ -109,36 +109,41 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('inventario:delete', async (_, id) => {
-    const result = run('DELETE FROM inventario WHERE id = ?', [id]);
+    const result = await run('DELETE FROM inventario WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   ipcMain.handle('inventario:registrarMovimiento', async (_, movimiento) => {
-    const db = getDb();
-    const transaction = db.transaction(() => {
-      run(`UPDATE inventario SET cantidad = cantidad + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, 
+    try {
+      await run('BEGIN TRANSACTION');
+
+      await run(`UPDATE inventario SET cantidad = cantidad + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [movimiento.cantidad, movimiento.producto_id]);
-      
+
       const sqlMov = `INSERT INTO movimientos_inventario 
         (producto_id, tipo, cantidad, motivo, referencia_id, referencia_tipo, usuario, notas) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-      run(sqlMov, [
+      await run(sqlMov, [
         movimiento.producto_id, movimiento.tipo, movimiento.cantidad,
         movimiento.motivo, movimiento.referencia_id, movimiento.referencia_tipo,
         movimiento.usuario, movimiento.notas
       ]);
-    });
-    transaction();
-    return { success: true };
+
+      await run('COMMIT');
+      return { success: true };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('inventario:getMovimientos', async (_, productoId) => {
-    return query(`SELECT * FROM movimientos_inventario 
+    return await query(`SELECT * FROM movimientos_inventario 
       WHERE producto_id = ? ORDER BY created_at DESC LIMIT 50`, [productoId]);
   });
 
   ipcMain.handle('inventario:getAlertasStock', async () => {
-    return query(`SELECT * FROM inventario 
+    return await query(`SELECT * FROM inventario 
       WHERE cantidad <= stock_minimo AND stock_minimo > 0 
       ORDER BY (cantidad / stock_minimo) ASC`);
   });
