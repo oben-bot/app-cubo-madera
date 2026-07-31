@@ -146,7 +146,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   // ==================== COTIZACIONES HANDLERS ====================
 
   ipcMain.handle('cotizaciones:getAll', async () => {
-    return query(`
+    return await query(`
       SELECT c.*, cl.nombre as cliente_nombre 
       FROM cotizaciones c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
@@ -155,92 +155,100 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('cotizaciones:getById', async (_, id) => {
-    const cotizacion = get(`
+    const cotizacion = await get(`
       SELECT c.*, cl.nombre as cliente_nombre, cl.telefono, cl.email 
       FROM cotizaciones c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
       WHERE c.id = ?
     `, [id]);
-    
+
     if (cotizacion) {
-      cotizacion.detalles = query('SELECT * FROM cotizaciones_detalle WHERE cotizacion_id = ?', [id]);
+      cotizacion.detalles = await query('SELECT * FROM cotizaciones_detalle WHERE cotizacion_id = ?', [id]);
     }
     return cotizacion;
   });
 
   ipcMain.handle('cotizaciones:create', async (_, cotizacion) => {
-    const db = getDb();
     const folio = generarFolio();
-    
-    let cotizacionId;
-    const transaction = db.transaction(() => {
-      const result = run(`INSERT INTO cotizaciones 
+    try {
+      await run('BEGIN TRANSACTION');
+
+      const result = await run(`INSERT INTO cotizaciones 
         (folio, cliente_id, validez_dias, subtotal, iva, total, notas) 
         VALUES (?, ?, ?, ?, ?, ?, ?)`, [
         folio, cotizacion.cliente_id, cotizacion.validez_dias || 15,
         cotizacion.subtotal || 0, cotizacion.iva || 0, cotizacion.total || 0,
         cotizacion.notas
       ]);
-      cotizacionId = result.lastInsertRowid;
+      const cotizacionId = result.lastID;
 
       if (cotizacion.detalles && cotizacion.detalles.length > 0) {
         const sqlDetalle = `INSERT INTO cotizaciones_detalle 
           (cotizacion_id, tipo, referencia_id, descripcion, cantidad, precio_unitario, descuento, total) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         for (const detalle of cotizacion.detalles) {
-          run(sqlDetalle, [
+          await run(sqlDetalle, [
             cotizacionId, detalle.tipo, detalle.referencia_id,
             detalle.descripcion, detalle.cantidad, detalle.precio_unitario,
             detalle.descuento || 0, detalle.total
           ]);
         }
       }
-    });
-    transaction();
-    return { id: cotizacionId, folio };
+
+      await run('COMMIT');
+      return { id: cotizacionId, folio };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('cotizaciones:update', async (_, id, cotizacion) => {
-    const db = getDb();
-    const transaction = db.transaction(() => {
-      run(`UPDATE cotizaciones SET 
+    try {
+      await run('BEGIN TRANSACTION');
+
+      await run(`UPDATE cotizaciones SET 
         cliente_id = ?, validez_dias = ?, subtotal = ?, iva = ?, total = ?, 
         notas = ?, estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [
         cotizacion.cliente_id, cotizacion.validez_dias, cotizacion.subtotal,
         cotizacion.iva, cotizacion.total, cotizacion.notas, cotizacion.estado, id
       ]);
-      
-      run('DELETE FROM cotizaciones_detalle WHERE cotizacion_id = ?', [id]);
-      
+
+      await run('DELETE FROM cotizaciones_detalle WHERE cotizacion_id = ?', [id]);
+
       if (cotizacion.detalles && cotizacion.detalles.length > 0) {
         const sqlDetalle = `INSERT INTO cotizaciones_detalle 
           (cotizacion_id, tipo, referencia_id, descripcion, cantidad, precio_unitario, descuento, total) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         for (const detalle of cotizacion.detalles) {
-          run(sqlDetalle, [
+          await run(sqlDetalle, [
             id, detalle.tipo, detalle.referencia_id,
             detalle.descripcion, detalle.cantidad, detalle.precio_unitario,
             detalle.descuento || 0, detalle.total
           ]);
         }
       }
-    });
-    transaction();
-    return { success: true };
+
+      await run('COMMIT');
+      return { success: true };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('cotizaciones:changeStatus', async (_, id, estado) => {
-    run('UPDATE cotizaciones SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [estado, id]);
+    await run('UPDATE cotizaciones SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [estado, id]);
     return { success: true };
   });
 
   ipcMain.handle('cotizaciones:delete', async (_, id) => {
-    const result = run('DELETE FROM cotizaciones WHERE id = ?', [id]);
+    const result = await run('DELETE FROM cotizaciones WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   ipcMain.handle('cotizaciones:getProductosDisponibles', async () => {
-    return query(`SELECT id, nombre, codigo, precio_venta, unidad FROM inventario 
+    return await query(`SELECT id, nombre, codigo, precio_venta, unidad FROM inventario 
       WHERE tipo IN ('producto_terminado', 'materia_prima') AND cantidad > 0
       ORDER BY nombre`);
   });
