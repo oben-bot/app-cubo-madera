@@ -291,52 +291,59 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('trabajos:getById', async (_, id) => {
-    const trabajo = get(`
+    const trabajo = await get(`
       SELECT t.*, c.nombre as cliente_nombre, c.telefono, c.email
       FROM trabajos t
       LEFT JOIN clientes c ON t.cliente_id = c.id
       WHERE t.id = ?
     `, [id]);
-    
+
     if (trabajo) {
-      trabajo.evidencias = query('SELECT * FROM evidencias WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
-      trabajo.actividades = query('SELECT * FROM trabajo_actividades WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
+      trabajo.evidencias = await query('SELECT * FROM evidencias WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
+      trabajo.actividades = await query('SELECT * FROM trabajo_actividades WHERE trabajo_id = ? ORDER BY created_at DESC', [id]);
     }
     return trabajo;
   });
 
   ipcMain.handle('trabajos:crearDesdeCotizacion', async (_, cotizacionId) => {
-    const cotizacion = get(`
+    const cotizacion = await get(`
       SELECT c.*, cl.nombre as cliente_nombre 
       FROM cotizaciones c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
       WHERE c.id = ?
     `, [cotizacionId]);
-    
+
     if (!cotizacion) throw new Error('Cotización no encontrada');
-    
+
     const numeroTrabajo = generarNumeroTrabajo();
     const fechaEstimada = new Date();
     fechaEstimada.setDate(fechaEstimada.getDate() + (cotizacion.validez_dias || 15));
-    
-    const result = run(`INSERT INTO trabajos 
-      (numero_trabajo, cotizacion_id, cliente_id, titulo, descripcion, 
-       estado, fecha_entrega_estimada, precio_total, notas) 
-      VALUES (?, ?, ?, ?, ?, 'en_cola', ?, ?, ?)`, [
-      numeroTrabajo, cotizacionId, cotizacion.cliente_id,
-      `Trabajo desde cotización ${cotizacion.folio}`,
-      cotizacion.notas, fechaEstimada.toISOString(),
-      cotizacion.total, `Trabajo generado desde cotización ${cotizacion.folio}`
-    ]);
-    
-    run('UPDATE cotizaciones SET estado = "convertida", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cotizacionId]);
-    
-    return { id: result.lastInsertRowid, numero_trabajo: numeroTrabajo };
+
+    try {
+      await run('BEGIN TRANSACTION');
+      const result = await run(`INSERT INTO trabajos 
+        (numero_trabajo, cotizacion_id, cliente_id, titulo, descripcion, 
+         estado, fecha_entrega_estimada, precio_total, notas) 
+        VALUES (?, ?, ?, ?, ?, 'en_cola', ?, ?, ?)`, [
+        numeroTrabajo, cotizacionId, cotizacion.cliente_id,
+        `Trabajo desde cotización ${cotizacion.folio}`,
+        cotizacion.notas, fechaEstimada.toISOString(),
+        cotizacion.total, `Trabajo generado desde cotización ${cotizacion.folio}`
+      ]);
+
+      await run('UPDATE cotizaciones SET estado = "convertida", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cotizacionId]);
+      await run('COMMIT');
+
+      return { id: result.lastID, numero_trabajo: numeroTrabajo };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('trabajos:create', async (_, trabajo) => {
     const numeroTrabajo = generarNumeroTrabajo();
-    const result = run(`INSERT INTO trabajos 
+    const result = await run(`INSERT INTO trabajos 
       (numero_trabajo, cliente_id, titulo, descripcion, estado, prioridad,
        fecha_entrega_estimada, costo_materiales, costo_mano_obra, precio_total, notas) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
@@ -346,11 +353,11 @@ function registerIpcHandlers(ipcMain, mainWindow) {
       trabajo.costo_mano_obra || 0, trabajo.precio_total || 0,
       trabajo.notas
     ]);
-    return { id: result.lastInsertRowid, numero_trabajo: numeroTrabajo };
+    return { id: result.lastID, numero_trabajo: numeroTrabajo };
   });
 
   ipcMain.handle('trabajos:update', async (_, id, trabajo) => {
-    run(`UPDATE trabajos SET 
+    await run(`UPDATE trabajos SET 
       titulo = ?, descripcion = ?, estado = ?, prioridad = ?,
       fecha_inicio = ?, fecha_entrega_estimada = ?, fecha_entrega_real = ?,
       costo_materiales = ?, costo_mano_obra = ?, precio_total = ?,
@@ -366,50 +373,50 @@ function registerIpcHandlers(ipcMain, mainWindow) {
 
   ipcMain.handle('trabajos:changeStatus', async (_, id, nuevoEstado) => {
     const updates = { estado: nuevoEstado, updated_at: new Date().toISOString() };
-    const current = get('SELECT fecha_inicio FROM trabajos WHERE id = ?', [id]);
-    
+    const current = await get('SELECT fecha_inicio FROM trabajos WHERE id = ?', [id]);
+    if (!current) throw new Error('Trabajo no encontrado');
+
     if (nuevoEstado === 'en_proceso' && !current.fecha_inicio) {
       updates.fecha_inicio = new Date().toISOString();
     }
     if (nuevoEstado === 'entregado') {
       updates.fecha_entrega_real = new Date().toISOString();
     }
-    
+
     const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
     const values = [...Object.values(updates), id];
-    
-    run(`UPDATE trabajos SET ${setClause} WHERE id = ?`, values);
-    
-    run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, usuario) VALUES (?, ?, ?)`,
+
+    await run(`UPDATE trabajos SET ${setClause} WHERE id = ?`, values);
+    await run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, usuario) VALUES (?, ?, ?)`,
       [id, `Estado cambiado a ${nuevoEstado}`, 'sistema']);
-    
+
     return { success: true };
   });
 
   ipcMain.handle('trabajos:addEvidencia', async (_, trabajoId, archivoPath, descripcion) => {
-    const result = run(`INSERT INTO evidencias (trabajo_id, archivo_ruta, descripcion) VALUES (?, ?, ?)`,
+    const result = await run(`INSERT INTO evidencias (trabajo_id, archivo_ruta, descripcion) VALUES (?, ?, ?)`,
       [trabajoId, archivoPath, descripcion]);
-    return { id: result.lastInsertRowid };
+    return { id: result.lastID };
   });
 
   ipcMain.handle('trabajos:deleteEvidencia', async (_, id) => {
-    const result = run('DELETE FROM evidencias WHERE id = ?', [id]);
+    const result = await run('DELETE FROM evidencias WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   ipcMain.handle('trabajos:addActividad', async (_, trabajoId, actividad, duracion) => {
-    run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, duracion_minutos, usuario) VALUES (?, ?, ?, ?)`,
+    await run(`INSERT INTO trabajo_actividades (trabajo_id, actividad, duracion_minutos, usuario) VALUES (?, ?, ?, ?)`,
       [trabajoId, actividad, duracion, 'usuario']);
     return { success: true };
   });
 
   ipcMain.handle('trabajos:delete', async (_, id) => {
-    const result = run('DELETE FROM trabajos WHERE id = ?', [id]);
+    const result = await run('DELETE FROM trabajos WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   ipcMain.handle('trabajos:getCotizacionesAprobadas', async () => {
-    return query(`
+    return await query(`
       SELECT c.*, cl.nombre as cliente_nombre 
       FROM cotizaciones c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
@@ -423,7 +430,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   // ==================== VENTAS HANDLERS ====================
 
   ipcMain.handle('ventas:getAll', async () => {
-    return query(`
+    return await query(`
       SELECT v.*, c.nombre as cliente_nombre, t.numero_trabajo
       FROM ventas v
       LEFT JOIN clientes c ON v.cliente_id = c.id
@@ -433,104 +440,110 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('ventas:getById', async (_, id) => {
-    const venta = get(`
+    const venta = await get(`
       SELECT v.*, c.nombre as cliente_nombre, c.telefono, c.email
       FROM ventas v
       LEFT JOIN clientes c ON v.cliente_id = c.id
       WHERE v.id = ?
     `, [id]);
-    
+
     if (venta) {
-      venta.detalles = query('SELECT * FROM ventas_detalle WHERE venta_id = ?', [id]);
+      venta.detalles = await query('SELECT * FROM ventas_detalle WHERE venta_id = ?', [id]);
     }
     return venta;
   });
 
   ipcMain.handle('ventas:crearDesdeTrabajo', async (_, trabajoId, metodo_pago) => {
-    const trabajo = get('SELECT * FROM trabajos WHERE id = ?', [trabajoId]);
+    const trabajo = await get('SELECT * FROM trabajos WHERE id = ?', [trabajoId]);
     if (!trabajo) throw new Error('Trabajo no encontrado');
-    
+
     const folio = generarFolioVenta();
-    const db = getDb();
-    
-    let ventaId;
-    const transaction = db.transaction(() => {
-      const result = run(`INSERT INTO ventas 
+
+    try {
+      await run('BEGIN TRANSACTION');
+
+      const result = await run(`INSERT INTO ventas 
         (folio, trabajo_id, cliente_id, total, metodo_pago, notas) 
-        VALUES (?, ?, ?, ?, ?, ?)`, 
+        VALUES (?, ?, ?, ?, ?, ?)`,
         [folio, trabajoId, trabajo.cliente_id, trabajo.precio_total, metodo_pago, `Venta del trabajo ${trabajo.numero_trabajo}`]);
-      ventaId = result.lastInsertRowid;
-      
-      run(`INSERT INTO finanzas_movimientos 
+      const ventaId = result.lastID;
+
+      await run(`INSERT INTO finanzas_movimientos 
         (tipo, categoria, monto, referencia_id, referencia_tipo, descripcion, usuario) 
         VALUES ('ingreso', 'venta', ?, ?, 'venta', ?, 'sistema')`,
         [trabajo.precio_total, ventaId, `Venta ${folio}`]);
-      
-      run('UPDATE trabajos SET estado = "entregado", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [trabajoId]);
-    });
-    transaction();
-    
-    return { id: ventaId, folio };
+
+      await run('UPDATE trabajos SET estado = "entregado", updated_at = CURRENT_TIMESTAMP WHERE id = ?', [trabajoId]);
+
+      await run('COMMIT');
+      return { id: ventaId, folio };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('ventas:create', async (_, venta) => {
     const folio = generarFolioVenta();
-    const db = getDb();
-    
-    let ventaId;
-    const transaction = db.transaction(() => {
-      const result = run(`INSERT INTO ventas 
+
+    try {
+      await run('BEGIN TRANSACTION');
+
+      const result = await run(`INSERT INTO ventas 
         (folio, cliente_id, subtotal, iva, total, metodo_pago, notas) 
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [folio, venta.cliente_id, venta.subtotal, venta.iva, venta.total, venta.metodo_pago, venta.notas]);
-      ventaId = result.lastInsertRowid;
-      
+      const ventaId = result.lastID;
+
       if (venta.detalles && venta.detalles.length > 0) {
         for (const detalle of venta.detalles) {
-          run(`INSERT INTO ventas_detalle 
+          await run(`INSERT INTO ventas_detalle 
             (venta_id, producto_id, descripcion, cantidad, precio_unitario, total) 
             VALUES (?, ?, ?, ?, ?, ?)`,
             [ventaId, detalle.producto_id, detalle.descripcion, detalle.cantidad, detalle.precio_unitario, detalle.total]);
-          
+
           if (detalle.producto_id) {
-            run(`UPDATE inventario SET cantidad = cantidad - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            await run(`UPDATE inventario SET cantidad = cantidad - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
               [detalle.cantidad, detalle.producto_id]);
-            
-            run(`INSERT INTO movimientos_inventario 
+
+            await run(`INSERT INTO movimientos_inventario 
               (producto_id, tipo, cantidad, motivo, referencia_id, referencia_tipo, notas) 
               VALUES (?, 'salida', ?, 'venta', ?, 'venta', ?)`,
               [detalle.producto_id, -detalle.cantidad, ventaId, `Venta ${folio}`]);
           }
         }
       }
-      
-      run(`INSERT INTO finanzas_movimientos 
+
+      await run(`INSERT INTO finanzas_movimientos 
         (tipo, categoria, monto, referencia_id, referencia_tipo, descripcion, usuario) 
         VALUES ('ingreso', 'venta', ?, ?, 'venta', ?, 'sistema')`,
         [venta.total, ventaId, `Venta ${folio}`]);
-    });
-    transaction();
-    
-    return { id: ventaId, folio };
+
+      await run('COMMIT');
+      return { id: ventaId, folio };
+    } catch (err) {
+      await run('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 
   ipcMain.handle('ventas:delete', async (_, id) => {
-    const result = run('DELETE FROM ventas WHERE id = ?', [id]);
+    const result = await run('DELETE FROM ventas WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   // ==================== FINANZAS HANDLERS ====================
 
   ipcMain.handle('finanzas:getAll', async () => {
-    return query('SELECT * FROM finanzas_movimientos ORDER BY fecha DESC LIMIT 500');
+    return await query('SELECT * FROM finanzas_movimientos ORDER BY fecha DESC LIMIT 500');
   });
 
   ipcMain.handle('finanzas:registrarEgreso', async (_, egreso) => {
-    const result = run(`INSERT INTO finanzas_movimientos 
+    const result = await run(`INSERT INTO finanzas_movimientos 
       (tipo, categoria, monto, descripcion, usuario) 
       VALUES ('egreso', ?, ?, ?, ?)`,
       [egreso.categoria, egreso.monto, egreso.descripcion, egreso.usuario]);
-    return { id: result.lastInsertRowid };
+    return { id: result.lastID };
   });
 
   ipcMain.handle('finanzas:getResumen', async (_, periodo) => {
