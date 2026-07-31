@@ -549,7 +549,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   ipcMain.handle('finanzas:getResumen', async (_, periodo) => {
     let fechaInicio = '';
     const hoy = new Date();
-    
+
     switch(periodo) {
       case 'dia':
         fechaInicio = new Date(hoy.setHours(0,0,0,0)).toISOString();
@@ -566,13 +566,14 @@ function registerIpcHandlers(ipcMain, mainWindow) {
       default:
         fechaInicio = '1970-01-01';
     }
-    
-    const ingresos = get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
-      WHERE tipo = 'ingreso' AND fecha >= ?`, [fechaInicio]).total;
-    
-    const egresos = get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
-      WHERE tipo = 'egreso' AND fecha >= ?`, [fechaInicio]).total;
-    
+
+    const ingresosRow = await get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
+      WHERE tipo = 'ingreso' AND fecha >= ?`, [fechaInicio]);
+    const egresosRow = await get(`SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos 
+      WHERE tipo = 'egreso' AND fecha >= ?`, [fechaInicio]);
+    const ingresos = ingresosRow.total;
+    const egresos = egresosRow.total;
+
     return {
       periodo,
       ingresos,
@@ -583,7 +584,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('finanzas:getTrabajosTerminados', async () => {
-    return query(`
+    return await query(`
       SELECT t.*, c.nombre as cliente_nombre 
       FROM trabajos t
       LEFT JOIN clientes c ON t.cliente_id = c.id
@@ -597,7 +598,7 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   // ==================== CALENDARIO HANDLERS ====================
 
   ipcMain.handle('calendario:getEventos', async (_, fechaInicio, fechaFin) => {
-    return query(`
+    return await query(`
       SELECT * FROM calendario_eventos 
       WHERE fecha_inicio BETWEEN ? AND ?
       ORDER BY fecha_inicio ASC
@@ -605,21 +606,21 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('calendario:getAll', async () => {
-    return query('SELECT * FROM calendario_eventos ORDER BY fecha_inicio DESC LIMIT 200');
+    return await query('SELECT * FROM calendario_eventos ORDER BY fecha_inicio DESC LIMIT 200');
   });
 
   ipcMain.handle('calendario:create', async (_, evento) => {
-    const result = run(`INSERT INTO calendario_eventos 
+    const result = await run(`INSERT INTO calendario_eventos 
       (titulo, descripcion, tipo, referencia_id, fecha_inicio, fecha_fin, color, recordatorio_minutos) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
       evento.titulo, evento.descripcion, evento.tipo, evento.referencia_id,
       evento.fecha_inicio, evento.fecha_fin, evento.color, evento.recordatorio_minutos || 0
     ]);
-    return { id: result.lastInsertRowid };
+    return { id: result.lastID };
   });
 
   ipcMain.handle('calendario:update', async (_, id, evento) => {
-    run(`UPDATE calendario_eventos SET 
+    await run(`UPDATE calendario_eventos SET 
       titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, color = ?, 
       recordatorio_minutos = ?, completado = ?
       WHERE id = ?`, [
@@ -630,38 +631,38 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   });
 
   ipcMain.handle('calendario:delete', async (_, id) => {
-    const result = run('DELETE FROM calendario_eventos WHERE id = ?', [id]);
+    const result = await run('DELETE FROM calendario_eventos WHERE id = ?', [id]);
     return { success: result.changes > 0 };
   });
 
   ipcMain.handle('calendario:syncTrabajos', async () => {
-    const trabajos = query(`
+    const trabajos = await query(`
       SELECT id, numero_trabajo, titulo, fecha_inicio, fecha_entrega_estimada, estado 
       FROM trabajos 
       WHERE fecha_inicio IS NOT NULL OR fecha_entrega_estimada IS NOT NULL
     `);
-    
+
     for (const trabajo of trabajos) {
       if (trabajo.fecha_inicio) {
-        const existe = get(`SELECT id FROM calendario_eventos 
+        const existe = await get(`SELECT id FROM calendario_eventos 
           WHERE tipo = 'trabajo' AND referencia_id = ? AND fecha_inicio = ?`,
           [trabajo.id, trabajo.fecha_inicio]);
-        
+
         if (!existe) {
-          run(`INSERT INTO calendario_eventos 
+          await run(`INSERT INTO calendario_eventos 
             (titulo, descripcion, tipo, referencia_id, fecha_inicio, color) 
             VALUES (?, ?, 'trabajo', ?, ?, '#3b82f6')`,
             [`Inicio: ${trabajo.numero_trabajo}`, trabajo.titulo, trabajo.id, trabajo.fecha_inicio]);
         }
       }
-      
+
       if (trabajo.fecha_entrega_estimada) {
-        const existe = get(`SELECT id FROM calendario_eventos 
+        const existe = await get(`SELECT id FROM calendario_eventos 
           WHERE tipo = 'trabajo' AND referencia_id = ? AND fecha_inicio = ? AND titulo LIKE 'Entrega%'`,
           [trabajo.id, trabajo.fecha_entrega_estimada]);
-        
+
         if (!existe) {
-          run(`INSERT INTO calendario_eventos 
+          await run(`INSERT INTO calendario_eventos 
             (titulo, descripcion, tipo, referencia_id, fecha_inicio, color, recordatorio_minutos) 
             VALUES (?, ?, 'trabajo', ?, ?, '#f59e0b', 1440)`,
             [`Entrega: ${trabajo.numero_trabajo}`, trabajo.titulo, trabajo.id, trabajo.fecha_entrega_estimada]);
@@ -676,8 +677,8 @@ function registerIpcHandlers(ipcMain, mainWindow) {
     hoyInicio.setHours(0, 0, 0, 0);
     const hoyFin = new Date();
     hoyFin.setHours(23, 59, 59, 999);
-    
-    return query(`
+
+    return await query(`
       SELECT * FROM calendario_eventos 
       WHERE fecha_inicio BETWEEN ? AND ?
       ORDER BY fecha_inicio ASC
