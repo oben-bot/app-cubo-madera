@@ -247,6 +247,27 @@ function getDatabase() {
       minutos_mano_obra REAL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    // ==================== MARKETING (integraciones externas) ====================
+    // NOTA: las integraciones reales (WordPress, WhatsApp, Gumroad) aún no están
+    // conectadas a ninguna API externa - ver ipcHandlers.js, quedan marcadas
+    // explícitamente como "simulado" hasta que se conecten de verdad.
+    db.run(`CREATE TABLE IF NOT EXISTS marketing_config (
+      plataforma TEXT PRIMARY KEY,
+      configuracion TEXT,
+      activo BOOLEAN DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS exportaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo TEXT NOT NULL,
+      referencia_id INTEGER,
+      destino TEXT,
+      estado TEXT DEFAULT 'pendiente',
+      resultado TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
   });
   
   return db;

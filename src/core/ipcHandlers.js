@@ -688,24 +688,31 @@ function registerIpcHandlers(ipcMain, mainWindow) {
   // ==================== MARKETING HANDLERS ====================
 
   ipcMain.handle('marketing:getConfig', async (_, plataforma) => {
-    return get('SELECT * FROM marketing_config WHERE plataforma = ?', [plataforma]);
+    return await get('SELECT * FROM marketing_config WHERE plataforma = ?', [plataforma]);
   });
 
   ipcMain.handle('marketing:saveConfig', async (_, plataforma, configuracion, activo) => {
-    run(`UPDATE marketing_config SET configuracion = ?, activo = ? WHERE plataforma = ?`,
-      [JSON.stringify(configuracion), activo ? 1 : 0, plataforma]);
+    await run(`INSERT INTO marketing_config (plataforma, configuracion, activo, updated_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(plataforma) DO UPDATE SET
+        configuracion = excluded.configuracion,
+        activo = excluded.activo,
+        updated_at = CURRENT_TIMESTAMP`,
+      [plataforma, JSON.stringify(configuracion), activo ? 1 : 0]);
     return { success: true };
   });
 
+  // NOTA: no conectado a la API real de WordPress todavía. Deja registro
+  // explícito de que es simulado para no generar falsa confianza.
   ipcMain.handle('marketing:exportToWordPress', async (_, productoId) => {
-    const producto = get('SELECT * FROM inventario WHERE id = ?', [productoId]);
+    const producto = await get('SELECT * FROM inventario WHERE id = ?', [productoId]);
     if (!producto) throw new Error('Producto no encontrado');
-    
-    run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
-      VALUES ('wordpress', ?, 'wordpress', 'completado', ?)`,
-      [productoId, `Producto "${producto.nombre}" exportado correctamente`]);
-    
-    return { success: true, message: `Producto "${producto.nombre}" preparado para exportar` };
+
+    await run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
+      VALUES ('wordpress', ?, 'wordpress', 'simulado', ?)`,
+      [productoId, `(Simulado, integración pendiente) Producto "${producto.nombre}" listo para exportar`]);
+
+    return { success: true, simulado: true, message: `(Simulado) Producto "${producto.nombre}" preparado para exportar - la conexión real con WordPress aún no está activa` };
   });
 
   ipcMain.handle('marketing:exportCatalogo', async (_, categoria = null) => {
@@ -715,42 +722,44 @@ function registerIpcHandlers(ipcMain, mainWindow) {
       sql += ' AND categoria = ?';
       params.push(categoria);
     }
-    const productos = query(sql, params);
-    
-    run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
-      VALUES ('catalogo', 'pdf', 'completado', ?)`,
-      [`Catálogo exportado con ${productos.length} productos`]);
-    
-    return { success: true, productos: productos, count: productos.length };
+    const productos = await query(sql, params);
+
+    await run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
+      VALUES ('catalogo', 'pdf', 'simulado', ?)`,
+      [`(Simulado) Catálogo con ${productos.length} productos`]);
+
+    return { success: true, simulado: true, productos: productos, count: productos.length };
   });
 
+  // NOTA: no conectado a la API real de WhatsApp Business todavía (simulado).
   ipcMain.handle('marketing:sendWhatsApp', async (_, cotizacionId, numeroTelefono) => {
-    const cotizacion = get(`
+    const cotizacion = await get(`
       SELECT c.*, cl.nombre as cliente_nombre, cl.telefono 
       FROM cotizaciones c
       LEFT JOIN clientes cl ON c.cliente_id = cl.id
       WHERE c.id = ?
     `, [cotizacionId]);
-    
+
     if (!cotizacion) throw new Error('Cotización no encontrada');
-    
+
     const mensaje = `📋 *COTIZACIÓN ${cotizacion.folio}*\n\nCliente: ${cotizacion.cliente_nombre}\nTotal: $${cotizacion.total}\nVálida hasta: ${new Date(Date.now() + cotizacion.validez_dias * 86400000).toLocaleDateString()}`;
-    
-    run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
-      VALUES ('whatsapp', ?, ?, 'completado', ?)`,
+
+    await run(`INSERT INTO exportaciones (tipo, referencia_id, destino, estado, resultado) 
+      VALUES ('whatsapp', ?, ?, 'simulado', ?)`,
       [cotizacionId, numeroTelefono || cotizacion.telefono, mensaje]);
-    
-    return { success: true, message: `Cotización enviada a ${cotizacion.cliente_nombre}` };
+
+    return { success: true, simulado: true, message: `(Simulado) Cotización lista para enviar a ${cotizacion.cliente_nombre} - la conexión real con WhatsApp aún no está activa` };
   });
 
+  // NOTA: no conectado a la API real de Gumroad todavía (simulado).
   ipcMain.handle('marketing:syncGumroad', async () => {
-    run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
-      VALUES ('gumroad', 'gumroad', 'completado', 'Sincronización completada')`);
-    return { success: true, message: 'Sincronización con Gumroad completada' };
+    await run(`INSERT INTO exportaciones (tipo, destino, estado, resultado) 
+      VALUES ('gumroad', 'gumroad', 'simulado', '(Simulado) Sincronización de prueba')`);
+    return { success: true, simulado: true, message: '(Simulado) La conexión real con Gumroad aún no está activa' };
   });
 
   ipcMain.handle('marketing:getExportaciones', async (_, limit = 50) => {
-    return query('SELECT * FROM exportaciones ORDER BY created_at DESC LIMIT ?', [limit]);
+    return await query('SELECT * FROM exportaciones ORDER BY created_at DESC LIMIT ?', [limit]);
   });
 
   // ==================== BIBLIOTECA LASER HANDLERS ====================
