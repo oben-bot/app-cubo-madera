@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ModuleHub from './ModuleHub';
 import './DashboardMain.css';
 
 const DashboardMain = () => {
@@ -131,6 +132,8 @@ const DashboardMain = () => {
           <button className={periodo === 'año' ? 'active' : ''} onClick={() => setPeriodo('año')}>Año</button>
         </div>
       </div>
+
+      <ModuleHub />
 
       {/* Tarjetas de KPIs */}
       <div className="kpi-grid">
